@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAdminDashboardStats } from "../services/admin.api";
 import api from "../../api/axios";
-import API_URL from "../constantApi";
+import API_URL from "../../constantApi";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
