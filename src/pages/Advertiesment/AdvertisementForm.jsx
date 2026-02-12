@@ -1,0 +1,332 @@
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { getCompanies } from "../services/company.api";
+import { getLocationsByCompany } from "../services/location.api";
+import {
+  createAdvertisement,
+  updateAdvertisement,
+} from "../services/advertisement.api";
+import { useNavigate, useLocation } from "react-router-dom";
+
+const AdvertisementForm = ({ initialData = null }) => {
+  const isEditMode = Boolean(initialData?._id);
+  const navigate = useNavigate();
+  const locationState = useLocation();
+
+  const [companies, setCompanies] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [videoFile, setVideoFile] = useState(null);
+
+  // === DEVICE STATES ===
+  const [devices, setDevices] = useState([]);
+  const [deviceSearch, setDeviceSearch] = useState("");
+  const [showDeviceDropdown, setShowDeviceDropdown] = useState(false);
+
+  const [formData, setFormData] = useState({
+    company_id: initialData?.company_id?._id || "",
+    location_id: initialData?.location_id?._id || "",
+    deviceId: initialData?.deviceId
+      ? Array.isArray(initialData.deviceId)
+        ? initialData.deviceId
+        : [initialData.deviceId]
+      : [],
+    title: initialData?.title || "",
+    description: initialData?.description || "",
+    startDate: initialData?.startDate?.slice(0, 10) || "",
+    endDate: initialData?.endDate?.slice(0, 10) || "",
+    playOrder: initialData?.playOrder || 1,
+  });
+
+  /* ---------------- Load Companies ---------------- */
+  useEffect(() => {
+    getCompanies().then((res) => setCompanies(res.data.data));
+  }, []);
+
+  /* ---------------- Load Locations by Company ---------------- */
+  useEffect(() => {
+    if (formData.company_id) {
+      getLocationsByCompany(formData.company_id).then((res) =>
+        setLocations(res.data.data)
+      );
+    } else {
+      setLocations([]);
+    }
+  }, [formData.company_id]);
+
+  /* ---------------- Load Devices by Location ---------------- */
+  useEffect(() => {
+    if (!formData.location_id) {
+      setDevices([]);
+      return;
+    }
+
+    axios
+      .get("http://localhost:5000/api/devices/list")
+      .then((res) => {
+        const filtered = (res.data.data || []).filter((d) =>
+          d.location_id?.some((loc) => loc._id === formData.location_id)
+        );
+        setDevices(filtered);
+      })
+      .catch((err) => console.error("Device fetch error:", err));
+  }, [formData.location_id]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "company_id" && { location_id: "", deviceId: [] }),
+      ...(name === "location_id" && { deviceId: [] }),
+    }));
+  };
+
+  const filteredDevices = devices.filter((d) =>
+    d.deviceId.toLowerCase().includes(deviceSearch.toLowerCase())
+  );
+
+  const toggleDevice = (deviceId) => {
+    setFormData((prev) => {
+      const exists = prev.deviceId.includes(deviceId);
+
+      const newDevices = exists
+        ? prev.deviceId.filter((id) => id !== deviceId)
+        : [...prev.deviceId, deviceId];
+
+      return { ...prev, deviceId: newDevices };
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const payload = new FormData();
+
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key === "deviceId") {
+        payload.append(key, JSON.stringify(value)); // send array properly
+      } else {
+        payload.append(key, value);
+      }
+    });
+
+    if (videoFile) {
+      payload.append("video", videoFile);
+    }
+
+    try {
+      if (isEditMode) {
+        await updateAdvertisement(initialData._id, payload);
+        alert("Advertisement updated successfully");
+      } else {
+        await createAdvertisement(payload);
+        alert("Advertisement created successfully");
+      }
+
+      navigate("/advertisements");
+    } catch (error) {
+      alert(error?.response?.data?.message || "Something went wrong");
+    }
+  };
+
+  return (
+    <form
+      className="max-w-4xl mx-auto bg-white p-8 shadow rounded"
+      onSubmit={handleSubmit}
+      encType="multipart/form-data"
+    >
+      <h2 className="text-2xl font-semibold mb-6">
+        {isEditMode ? "Edit Advertisement" : "Create Advertisement"}
+      </h2>
+
+      {/* Company */}
+      <Select
+        label="Company"
+        name="company_id"
+        required
+        value={formData.company_id}
+        onChange={handleChange}
+        options={companies}
+      />
+
+      {/* Location */}
+      <Select
+        label="Location"
+        name="location_id"
+        required
+        value={formData.location_id}
+        onChange={handleChange}
+        options={locations}
+      />
+
+      {/* DEVICE MULTI SELECT WITH SEARCH */}
+      <div className="mb-4 relative">
+        <label className="block mb-1 font-medium">Select Devices</label>
+
+        <div
+          className="w-full border rounded px-3 py-2 cursor-pointer bg-white"
+          onClick={() => setShowDeviceDropdown(!showDeviceDropdown)}
+        >
+          {formData.deviceId.length > 0
+            ? formData.deviceId.join(", ")
+            : "Search and select devices..."}
+        </div>
+
+        {showDeviceDropdown && (
+          <div className="absolute left-0 right-0 bg-white border rounded mt-1 max-h-60 overflow-auto shadow z-10 p-2">
+            <input
+              type="text"
+              placeholder="Search device..."
+              value={deviceSearch}
+              onChange={(e) => setDeviceSearch(e.target.value)}
+              className="w-full border rounded px-2 py-1 mb-2"
+            />
+
+            {filteredDevices.length > 0 ? (
+              filteredDevices.map((d) => {
+                const isChecked = formData.deviceId.includes(d.deviceId);
+
+                return (
+                  <label
+                    key={d._id}
+                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleDevice(d.deviceId)}
+                    />
+                    {d.deviceId} — {d.deviceName}
+                  </label>
+                );
+              })
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-gray-500">No device found</p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/add-device", {
+                      state: { returnTo: window.location.pathname },
+                    })
+                  }
+                  className="mt-2 px-3 py-1 bg-blue-600 text-white rounded"
+                >
+                  + Add Device
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* <p className="text-sm text-gray-500 mt-1">
+          Click to search and select multiple devices
+        </p> */}
+      </div>
+
+      <Input
+        label="Video Title"
+        name="title"
+        required
+        value={formData.title}
+        onChange={handleChange}
+      />
+
+      {/* Video Upload */}
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">
+          Upload Video {isEditMode ? "(optional)" : "*"}
+        </label>
+        <input
+          type="file"
+          accept="video/*"
+          required={!isEditMode}
+          onChange={(e) => setVideoFile(e.target.files[0])}
+          className="w-full border rounded px-3 py-2"
+        />
+      </div>
+
+      <Input
+        label="Play Order"
+        name="playOrder"
+        type="number"
+        value={formData.playOrder}
+        onChange={handleChange}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          label="Start Date"
+          name="startDate"
+          type="date"
+          value={formData.startDate}
+          onChange={handleChange}
+        />
+        <Input
+          label="End Date"
+          name="endDate"
+          type="date"
+          value={formData.endDate}
+          onChange={handleChange}
+        />
+      </div>
+
+      <Textarea
+        label="Description"
+        name="description"
+        value={formData.description}
+        onChange={handleChange}
+      />
+
+      <div className="flex justify-end mt-6">
+        <button className="px-6 py-2 bg-blue-600 text-white rounded">
+          Save Advertisement
+        </button>
+      </div>
+    </form>
+  );
+};
+
+/* ---------------- Reusable UI Components ---------------- */
+
+const Input = ({ label, ...props }) => (
+  <div className="mb-4">
+    <label className="block mb-1 font-medium">{label}</label>
+    <input
+      {...props}
+      className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+);
+
+const Textarea = ({ label, ...props }) => (
+  <div className="mb-4">
+    <label className="block mb-1 font-medium">{label}</label>
+    <textarea
+      {...props}
+      rows="3"
+      className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
+);
+
+const Select = ({ label, options, ...props }) => (
+  <div className="mb-4">
+    <label className="block mb-1 font-medium">{label}</label>
+    <select
+      {...props}
+      className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">Select {label}</option>
+      {options.map((o) => (
+        <option key={o._id} value={o._id}>
+          {o.name}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+export default AdvertisementForm;
