@@ -1,6 +1,7 @@
 // src/components/Register.js
 import React, { useState } from "react";
-import axios from "axios";
+// import axios from "axios";
+import api from "../../api/axios";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -18,10 +19,12 @@ export default function Register() {
     e.preventDefault();
     setMessage("");
     try {
-      const res = await axios.post(
-        "http://localhost:5000/api/auth/register",
-        form
-      );
+      // const res = await axios.post(
+      //   "http://localhost:5000/api/auth/register",
+      //   form
+      // );
+      const res = await api.post("/auth/register", form);
+
       setMessage("Registered successfully! Please login.");
       setForm({ name: "", email: "", password: "", role: "customer" });
     } catch (err) {

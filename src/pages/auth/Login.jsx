@@ -1,5 +1,7 @@
 import React, { useState, useContext } from "react";
-import axios from "axios";
+// import axios from "axios";
+import api from "../../api/axios";
+
 import { AuthContext } from "../../contextAuth/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 
@@ -17,10 +19,12 @@ export default function Login() {
     e.preventDefault();
     setMessage("");
     try {
-      const res = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        form
-      );
+      // const res = await axios.post(
+      //   "http://localhost:5000/api/auth/login",
+      //   form
+      // );
+      const res = await api.post("/auth/login", form);
+
       saveToken(res.data.token, res.data.user);
 
       setMessage("Login successful!");

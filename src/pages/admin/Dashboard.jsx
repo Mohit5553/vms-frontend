@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAdminDashboardStats } from "../services/admin.api";
+import api from "../api/axios";
+import API_URL from "../constantApi";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -18,8 +20,11 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchLiveScreens = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/admin/live-screens");
+        // const res = await fetch("http://localhost:5000/api/admin/live-screens");
+        // const data = await res.json();
+        const res = await api.get("/admin/live-screens");
         const data = await res.json();
+
         setLiveScreens(data.data || []);
       } catch (err) {
         console.error("Live screens error:", err);
@@ -67,8 +72,11 @@ export default function AdminDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {liveScreens.map((screen) => {
+              // const videoUrl = screen.currentVideo
+              //   ? `http://localhost:5000${screen.currentVideo}`
+              //   : null;
               const videoUrl = screen.currentVideo
-                ? `http://localhost:5000${screen.currentVideo}`
+                ? `${API_URL}${screen.currentVideo}`
                 : null;
 
               return (

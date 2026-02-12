@@ -16,11 +16,21 @@
 // export default axios.create({
 //   baseURL: BASE_URL,
 // });
+// import axios from "axios";
+
+// const baseURL =
+//   import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+// export default axios.create({
+//   baseURL,
+// });
 import axios from "axios";
 
-const baseURL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
-export default axios.create({
-  baseURL,
+const api = axios.create({
+  baseURL: `${API_URL}/api`,
+  withCredentials: true, // very important for login cookies
 });
+
+export default api;
