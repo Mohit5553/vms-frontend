@@ -2,33 +2,31 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getAdminDashboardStats } from "../services/admin.api";
 import api from "../../api/axios";
-import API_URL from "../../constantApi";
+import { SOCKET_BASE_URL } from "../../config";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liveScreens, setLiveScreens] = useState([]);
 
-  // Fetch dashboard stats
+  /* ===============================
+     Fetch Dashboard Stats
+  =============================== */
   useEffect(() => {
     getAdminDashboardStats()
       .then((res) => setStats(res.data.data))
+      .catch((err) => console.error("Stats error:", err))
       .finally(() => setLoading(false));
   }, []);
 
-  // Fetch live screens every 3 seconds (AUTO-REFRESH)
+  /* ===============================
+     Fetch Live Screens (Auto Refresh)
+  =============================== */
   useEffect(() => {
     const fetchLiveScreens = async () => {
       try {
-        // const res = await fetch("http://localhost:5000/api/admin/live-screens");
-        // const data = await res.json();
-        // const res = await api.get("/admin/live-screens");
-        // const data = await res.json();
-
-        // setLiveScreens(data.data || []);
         const res = await api.get("/admin/live-screens");
         setLiveScreens(res.data.data || []);
-
       } catch (err) {
         console.error("Live screens error:", err);
       }
@@ -52,7 +50,9 @@ export default function AdminDashboard() {
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-3xl font-semibold mb-8">Admin Dashboard</h1>
 
-      {/* Stats */}
+      {/* ===============================
+          Stats Section
+      =============================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <StatCard title="Companies" value={stats.companies || 0} />
         <StatCard title="Locations" value={stats.locations || 0} />
@@ -64,7 +64,9 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* LIVE VIDEO GRID SECTION */}
+      {/* ===============================
+          Live Video Grid
+      =============================== */}
       <div className="mt-8 bg-white p-6 rounded shadow border">
         <h2 className="text-2xl font-semibold mb-4">
           Live Videos ({liveScreens.length})
@@ -75,11 +77,8 @@ export default function AdminDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {liveScreens.map((screen) => {
-              // const videoUrl = screen.currentVideo
-              //   ? `http://localhost:5000${screen.currentVideo}`
-              //   : null;
               const videoUrl = screen.currentVideo
-                ? `${API_URL}${screen.currentVideo}`
+                ? `${SOCKET_BASE_URL}${screen.currentVideo}`
                 : null;
 
               return (
@@ -116,7 +115,9 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* Quick Actions */}
+      {/* ===============================
+          Quick Actions
+      =============================== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
         <QuickLink title="Manage Companies" to="/companies" />
         <QuickLink title="Manage Locations" to="/locations" />
@@ -126,7 +127,9 @@ export default function AdminDashboard() {
   );
 }
 
-/* ---------- Components ---------- */
+/* ===============================
+   Components
+================================ */
 
 const StatCard = ({ title, value, highlight }) => (
   <div
