@@ -10,6 +10,8 @@ const CompanyList = () => {
     setLoading(true);
     const res = await getCompanies();
     setCompanies(res.data.data);
+    console.log("Fetched companies:", res.data.data);
+
     setLoading(false);
   };
 
