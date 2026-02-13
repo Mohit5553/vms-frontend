@@ -1,10 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../api/axios";
-import { socket } from "../socket";
+import { createSocket } from "../socket";
 import { SOCKET_BASE_URL } from "../config";
 
 export default function VideoMaster() {
   const [videos, setVideos] = useState([]);
+  const socketRef = useRef(null);
+
+  /* ================= SOCKET ================= */
+
+  useEffect(() => {
+    const socket = createSocket();
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("Admin connected:", socket.id);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  /* ================= FETCH VIDEOS ================= */
 
   useEffect(() => {
     fetchVideos();
@@ -19,16 +37,24 @@ export default function VideoMaster() {
     }
   };
 
+  /* ================= PLAY & STOP ================= */
+
   const playAd = (video) => {
-    socket.emit("play-ad", {
+    if (!socketRef.current) return;
+
+    socketRef.current.emit("play-ad", {
       deviceId: video.deviceId,
       videoUrl: `${SOCKET_BASE_URL}${video.videoUrl}`,
     });
   };
 
   const stopAd = (video) => {
-    socket.emit("stop-ad", video.deviceId);
+    if (!socketRef.current) return;
+
+    socketRef.current.emit("stop-ad", video.deviceId);
   };
+
+  /* ================= UI ================= */
 
   return (
     <div className="p-6">
@@ -44,6 +70,7 @@ export default function VideoMaster() {
             <th>Action</th>
           </tr>
         </thead>
+
         <tbody>
           {videos.map((v) => (
             <tr key={v._id}>
@@ -52,8 +79,19 @@ export default function VideoMaster() {
               <td>{v.deviceId}</td>
               <td>{v.title}</td>
               <td>
-                <button onClick={() => playAd(v)}>▶ Play</button>
-                <button onClick={() => stopAd(v)}>⏹ Stop</button>
+                <button
+                  onClick={() => playAd(v)}
+                  className="mr-2 bg-green-600 text-white px-3 py-1 rounded"
+                >
+                  ▶ Play
+                </button>
+
+                <button
+                  onClick={() => stopAd(v)}
+                  className="bg-red-600 text-white px-3 py-1 rounded"
+                >
+                  ⏹ Stop
+                </button>
               </td>
             </tr>
           ))}
