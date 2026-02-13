@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import io from "socket.io-client";
+import { io } from "socket.io-client";
+import { SOCKET_BASE_URL } from "../config";
 
-const socket = io("http://localhost:5000");
+const socket = io(SOCKET_BASE_URL, {
+  transports: ["websocket"],
+  withCredentials: true,
+});
 
 export default function DevicePlayer({ deviceId }) {
   const videoRef = useRef();
@@ -16,7 +20,9 @@ export default function DevicePlayer({ deviceId }) {
       setCurrentIndex(0);
     });
 
-    return () => socket.off("play_ads");
+    return () => {
+      socket.off("play_ads");
+    };
   }, [deviceId]);
 
   const handleEnded = () => {
@@ -32,7 +38,7 @@ export default function DevicePlayer({ deviceId }) {
   return (
     <video
       ref={videoRef}
-      src={`http://localhost:5000/${playlist[currentIndex].videoPath}`}
+      src={`${SOCKET_BASE_URL}${playlist[currentIndex].videoPath}`}
       autoPlay
       controls={false}
       onEnded={handleEnded}

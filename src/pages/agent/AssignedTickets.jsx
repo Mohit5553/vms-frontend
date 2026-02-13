@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../api/axios"; // adjust path if needed
 
 export default function AssignedTickets() {
   const [tickets, setTickets] = useState([]);
@@ -9,21 +9,14 @@ export default function AssignedTickets() {
   useEffect(() => {
     async function fetchAssignedTickets() {
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
-          "http://localhost:5000/api/tickets/list",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await api.get("/tickets/list");
 
-        console.log("resposne data is --------------", response);
+        console.log("response data:", response);
 
-        // Assuming your API response shape is: { tickets: [...] }
-        setTickets(response.data.data);
-
+        setTickets(response.data.data || []);
         setLoading(false);
       } catch (err) {
+        console.error("Ticket fetch error:", err);
         setError("Failed to load assigned tickets");
         setLoading(false);
       }

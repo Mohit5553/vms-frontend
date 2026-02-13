@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { getCompanies } from "../services/company.api";
 import { getLocationsByCompany } from "../services/location.api";
-import axios from "axios";
+import api from "../../api/axios";
 
 const AddDevice = () => {
     const navigate = useNavigate();
@@ -47,8 +47,8 @@ const AddDevice = () => {
         if (!isEditMode) return;
 
         setLoading(true);
-        axios
-            .get(`http://localhost:5000/api/devices/listbyid/${id}`)
+        api
+            .get(`/devices/listbyid/${id}`)
             .then((res) => {
                 const d = res.data.data;
 
@@ -84,26 +84,19 @@ const AddDevice = () => {
 
         try {
             if (isEditMode) {
-                await axios.put(
-                    `http://localhost:5000/api/devices/update/${id}`,
-                    formData
-                );
+                await api.put(`/devices/update/${id}`, formData);
                 alert("Device updated successfully");
             } else {
-                await axios.post(
-                    "http://localhost:5000/api/devices/create",
-                    formData
-                );
+                await api.post("/devices/create", formData);
                 alert("Device added successfully");
             }
 
-            // ✅ FIXED NAVIGATION LOGIC
             navigate(returnTo);
-
         } catch (error) {
             alert(error?.response?.data?.message || "Something went wrong");
         }
     };
+
 
     if (loading) {
         return <p className="text-center mt-10">Loading device data...</p>;

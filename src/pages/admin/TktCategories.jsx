@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../api/axios";
 
 export default function CategoryExplorer() {
   const [categories, setCategories] = useState([]);
@@ -30,9 +30,10 @@ export default function CategoryExplorer() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5000/api/categories/list");
-      setCategories(res.data || []);
-    } catch {
+      const res = await api.get("/categories/list");
+      setCategories(res.data.data || res.data || []);
+    } catch (error) {
+      console.error("Category fetch error:", error);
       alert("Failed to load categories");
     } finally {
       setLoading(false);
@@ -71,19 +72,22 @@ export default function CategoryExplorer() {
 
   const submitCreate = async (e) => {
     e.preventDefault();
+
     try {
-      await axios.post(
-        "http://localhost:5000/api/categories/create",
-        createForm
-      );
+      await api.post("/categories/create", createForm);
+
       alert("Category created!");
+
       setCreateForm({
         name: "",
         families: [{ name: "", subFamilies: [{ name: "" }] }],
       });
+
       fetchCategories();
       setView("list");
+
     } catch (error) {
+      console.error("Create category error:", error);
       alert(error.response?.data?.message || "Creation failed");
     }
   };
@@ -95,11 +99,11 @@ export default function CategoryExplorer() {
       name: cat.name,
       families: cat.families.length
         ? cat.families.map((fam) => ({
-            name: fam.name,
-            subFamilies: fam.subFamilies.length
-              ? fam.subFamilies.map((sub) => ({ name: sub.name }))
-              : [{ name: "" }],
-          }))
+          name: fam.name,
+          subFamilies: fam.subFamilies.length
+            ? fam.subFamilies.map((sub) => ({ name: sub.name }))
+            : [{ name: "" }],
+        }))
         : [{ name: "", subFamilies: [{ name: "" }] }],
     });
     setView("edit");
@@ -136,21 +140,25 @@ export default function CategoryExplorer() {
 
   const submitEdit = async (e) => {
     e.preventDefault();
+
     try {
-      await axios.put(
-        `http://localhost:5000/api/categories/update/${editingCategoryId}`,
+      await api.put(
+        `/categories/update/${editingCategoryId}`,
         editForm
       );
-      alert("editingCategoryId------------",editingCategoryId);
-      
+
       alert("Category updated!");
+
       fetchCategories();
       setView("list");
       setEditingCategoryId(null);
+
     } catch (error) {
+      console.error("Update category error:", error);
       alert(error.response?.data?.message || "Update failed");
     }
   };
+
 
   // Navigation helpers
   const openFamilies = (cat) => {
@@ -203,11 +211,10 @@ export default function CategoryExplorer() {
                   {cat.name}
                 </h3>
                 <span
-                  className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                    cat.isActive
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
+                  className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${cat.isActive
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                    }`}
                 >
                   {cat.isActive ? "Active" : "Inactive"}
                 </span>

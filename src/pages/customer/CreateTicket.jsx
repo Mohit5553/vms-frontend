@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createTicket, getTickets } from "../../services/ticketService";
+import api from "../../api/axios";
 
 export default function SupportDashboard() {
   const [tickets, setTickets] = useState([]);
@@ -56,17 +57,17 @@ export default function SupportDashboard() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/categories/list");
-        const data = await res.json();
-        setCategories(data);
+        const res = await api.get("/categories/list");
+        setCategories(res.data || []);
       } catch (error) {
         console.error("Failed to load categories", error);
       }
     };
 
     fetchCategories();
-    fetchTickets(); // your existing fetch
+    fetchTickets();
   }, []);
+
 
   // CREATE TICKET
   const handleSubmit = async (e) => {

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useContext } from "react";
-import axios from "axios";
+import React, { useState, useEffect } from "react";
+import api from "../api/axios";
 import { socket } from "../socket";
+import { SOCKET_BASE_URL } from "../config";
 
 export default function VideoMaster() {
   const [videos, setVideos] = useState([]);
@@ -10,14 +11,18 @@ export default function VideoMaster() {
   }, []);
 
   const fetchVideos = async () => {
-    const res = await axios.get("http://localhost:5000/api/videos");
-    setVideos(res.data);
+    try {
+      const res = await api.get("/videos");
+      setVideos(res.data.data || res.data);
+    } catch (err) {
+      console.error("Fetch videos error:", err);
+    }
   };
 
   const playAd = (video) => {
     socket.emit("play-ad", {
       deviceId: video.deviceId,
-      videoUrl: `http://localhost:5000/${video.videoUrl}`,
+      videoUrl: `${SOCKET_BASE_URL}${video.videoUrl}`,
     });
   };
 

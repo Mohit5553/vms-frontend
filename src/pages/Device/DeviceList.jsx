@@ -1,18 +1,16 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import api from "../../api/axios";
 
 const DeviceList = () => {
     const navigate = useNavigate();
     const [devices, setDevices] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    const API_URL = "http://localhost:5000/api/devices";
-
     const fetchDevices = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`${API_URL}/list`);
+            const res = await api.get("/devices/list");
             setDevices(res.data.data || []);
         } catch (error) {
             alert("Failed to load devices");
@@ -29,7 +27,7 @@ const DeviceList = () => {
         if (!window.confirm("Are you sure you want to delete this device?")) return;
 
         try {
-            await axios.delete(`${API_URL}/delete/${id}`); // ✅ Correct route
+            await api.delete(`/devices/delete/${id}`);
             alert("Device deleted successfully");
             fetchDevices();
         } catch (error) {
@@ -75,9 +73,7 @@ const DeviceList = () => {
                                     <td className="border p-2">{i + 1}</td>
                                     <td className="border p-2 font-medium">{d.deviceId}</td>
                                     <td className="border p-2">{d.deviceName || "—"}</td>
-                                    <td className="border p-2">
-                                        {d.company_id?.name || "—"}
-                                    </td>
+                                    <td className="border p-2">{d.company_id?.name || "—"}</td>
                                     <td className="border p-2">
                                         {Array.isArray(d.location_id) && d.location_id.length > 0
                                             ? d.location_id.map((loc) => loc.name).join(", ")

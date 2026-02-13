@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import api from "../../api/axios";
 import { getCompanies } from "../services/company.api";
 import { getLocationsByCompany } from "../services/location.api";
 import {
@@ -54,14 +55,15 @@ const AdvertisementForm = ({ initialData = null }) => {
   }, [formData.company_id]);
 
   /* ---------------- Load Devices by Location ---------------- */
+  /* ---------------- Load Devices by Location ---------------- */
   useEffect(() => {
     if (!formData.location_id) {
       setDevices([]);
       return;
     }
 
-    axios
-      .get("http://localhost:5000/api/devices/list")
+    api
+      .get("/devices/list")
       .then((res) => {
         const filtered = (res.data.data || []).filter((d) =>
           d.location_id?.some((loc) => loc._id === formData.location_id)

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../../api/axios";
 import { useNavigate } from "react-router-dom";
 
 const CompanyForm = ({ initialData = null }) => {
@@ -65,27 +65,21 @@ const CompanyForm = ({ initialData = null }) => {
 
     try {
       if (isEditMode) {
-        await axios.put(
-          `http://localhost:5000/api/company/edit/${initialData._id}`,
-          formData,
-        );
+        await api.put(`/company/edit/${initialData._id}`, formData);
         setSuccessMsg("Company updated successfully");
-
-        // ✅ redirect after update
-        navigate("/companies");
       } else {
-        await axios.post("http://localhost:5000/api/company/create", formData);
+        await api.post("/company/create", formData);
         setSuccessMsg("Company created successfully");
-
-        // ✅ redirect after create
-        navigate("/companies");
       }
+
+      navigate("/companies");
     } catch (error) {
       setErrorMsg(error?.response?.data?.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
+
 
   /* ---------------- UI ---------------- */
 
