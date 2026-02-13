@@ -7,9 +7,7 @@ import {
 } from "../services/advertisement.api";
 import api from "../../api/axios";
 
-// import axios from "axios";
 
-// const API_URL = "http://localhost:5000/api";
 
 export default function AdvertisementList() {
   const [ads, setAds] = useState([]);
@@ -27,7 +25,6 @@ export default function AdvertisementList() {
       // Load saved playing locations from sessionStorage
       const saved = sessionStorage.getItem("playingDevices");
       if (saved) setIsPlaying(JSON.parse(saved));
-      // const deviceRes = await axios.get("http://localhost:5000/api/devices/list");
       const deviceRes = await api.get("/devices/list");
 
       const map = {};
