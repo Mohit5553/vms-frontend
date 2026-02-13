@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+// import axios from "axios";
+import api from "../api/axios";
+import API_URL from "../../constantApi";
 
-const API_URL = "http://localhost:5000/api";
+// const API_URL = "http://localhost:5000/api";
 
 export default function LiveScreens() {
     const [screens, setScreens] = useState([]);
@@ -9,7 +11,9 @@ export default function LiveScreens() {
 
     const fetchLiveScreens = async () => {
         try {
+            // const res = await axios.get(`${API_URL}/admin/live-screens`);
             const res = await axios.get(`${API_URL}/admin/live-screens`);
+
             setScreens(res.data.data || []);
         } catch (err) {
             console.error("Live screens error:", err);
@@ -42,8 +46,9 @@ export default function LiveScreens() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {screens.map((screen) => {
                         const videoUrl = screen.currentVideo
-                            ? `http://localhost:5000${screen.currentVideo}`
+                            ? `${API_URL}${screen.currentVideo}`
                             : null;
+                        //  ? `http://localhost:5000${screen.currentVideo}`
 
                         return (
                             <div

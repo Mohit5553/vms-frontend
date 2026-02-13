@@ -22,10 +22,13 @@ export default function AdminDashboard() {
       try {
         // const res = await fetch("http://localhost:5000/api/admin/live-screens");
         // const data = await res.json();
-        const res = await api.get("/admin/live-screens");
-        const data = await res.json();
+        // const res = await api.get("/admin/live-screens");
+        // const data = await res.json();
 
-        setLiveScreens(data.data || []);
+        // setLiveScreens(data.data || []);
+        const res = await api.get("/admin/live-screens");
+        setLiveScreens(res.data.data || []);
+
       } catch (err) {
         console.error("Live screens error:", err);
       }
