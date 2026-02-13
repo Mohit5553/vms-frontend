@@ -5,9 +5,11 @@ import {
   getAdvertisement,
   deleteAdvertisement,
 } from "../services/advertisement.api";
-import axios from "axios";
+import api from "../../api/axios";
 
-const API_URL = "http://localhost:5000/api";
+// import axios from "axios";
+
+// const API_URL = "http://localhost:5000/api";
 
 export default function AdvertisementList() {
   const [ads, setAds] = useState([]);
@@ -25,7 +27,8 @@ export default function AdvertisementList() {
       // Load saved playing locations from sessionStorage
       const saved = sessionStorage.getItem("playingDevices");
       if (saved) setIsPlaying(JSON.parse(saved));
-      const deviceRes = await axios.get("http://localhost:5000/api/devices/list");
+      // const deviceRes = await axios.get("http://localhost:5000/api/devices/list");
+      const deviceRes = await api.get("/devices/list");
 
       const map = {};
       (deviceRes.data.data || []).forEach((d) => {
@@ -106,7 +109,9 @@ export default function AdvertisementList() {
     try {
       // ✅ Use your EXISTING route: /advertisement/play
       for (const deviceId of deviceIds) {
-        await axios.post(`${API_URL}/advertisement/play`, {
+        // await axios.post(`${API_URL}/advertisement/play`, {
+        await api.post("/advertisement/play", {
+
           companyId,
           locationId,
           deviceId,
@@ -127,7 +132,9 @@ export default function AdvertisementList() {
     try {
       // ✅ Use your EXISTING route: /advertisement/stop
       for (const deviceId of deviceIds) {
-        await axios.post(`${API_URL}/advertisement/stop`, {
+        // await axios.post(`${API_URL}/advertisement/stop`, {
+        await api.post("/advertisement/stop", {
+
           companyId,
           deviceId,
         });
