@@ -26,6 +26,8 @@ export default function AdminDashboard() {
     const fetchLiveScreens = async () => {
       try {
         const res = await api.get("/admin/live-screens");
+        console.log("Live Screens:", res.data.data);
+
         setLiveScreens(res.data.data || []);
       } catch (err) {
         console.error("Live screens error:", err);
@@ -77,6 +79,7 @@ export default function AdminDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {liveScreens.map((screen) => {
+
               const videoUrl = screen.currentVideo
                 ? `${SOCKET_BASE_URL}${screen.currentVideo}`
                 : null;
@@ -86,19 +89,27 @@ export default function AdminDashboard() {
                   key={screen.deviceId}
                   className="border rounded shadow bg-white p-3"
                 >
-                  {videoUrl ? (
+                  {screen.currentVideo === "PAUSED" ? (
+                    <div className="w-full h-56 bg-yellow-500 flex items-center justify-center text-white font-bold">
+                      ⏸ Paused
+                    </div>
+                  ) : screen.currentVideo ? (
                     <video
-                      src={videoUrl}
+                      key={screen.deviceId}
+                      src={`${SOCKET_BASE_URL}${screen.currentVideo}`}
                       className="w-full h-56 object-contain bg-black"
-                      controls
                       muted
                       autoPlay
+                      loop
+                      playsInline
                     />
                   ) : (
-                    <div className="w-full h-56 bg-black flex items-center justify-center text-white">
-                      Video not started yet
+                    <div className="w-full h-56 bg-gray-500 flex items-center justify-center text-white">
+                      Inactive
                     </div>
                   )}
+
+
 
                   <div className="mt-2 text-center">
                     <p className="font-semibold">

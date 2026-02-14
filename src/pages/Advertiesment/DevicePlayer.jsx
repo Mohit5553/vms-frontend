@@ -14,7 +14,6 @@ export default function DevicePlayer({ deviceId }) {
   useEffect(() => {
     if (!deviceId) return;
 
-    // ✅ Create socket at runtime (fix localhost issue)
     const socket = io(SOCKET_BASE_URL, {
       transports: ["websocket"],
       reconnection: true,

@@ -14,6 +14,7 @@ export default function AdvertisementList() {
   const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState([]); // array of DEVICE IDs (MAC)
   const [deviceMap, setDeviceMap] = useState({});
+  const [pausedDevices, setPausedDevices] = useState([]);
 
   const fetchAds = async () => {
     setLoading(true);
@@ -26,6 +27,8 @@ export default function AdvertisementList() {
       const saved = sessionStorage.getItem("playingDevices");
       if (saved) setIsPlaying(JSON.parse(saved));
       const deviceRes = await api.get("/devices/list");
+      const savedPause = sessionStorage.getItem("pausedDevices");
+      if (savedPause) setPausedDevices(JSON.parse(savedPause));
 
       const map = {};
       (deviceRes.data.data || []).forEach((d) => {
@@ -55,52 +58,6 @@ export default function AdvertisementList() {
     deviceIds.length > 0 &&
     deviceIds.every((id) => isPlaying.includes(id));
 
-  // const playAds = async (companyId, locationId, deviceId) => {
-  //   try {
-  //     await axios.post(`${API_URL}/advertisement/play`, {
-  //       companyId,
-  //       locationId,
-  //       deviceId,   // 🔥 NEW
-  //     });
-
-  //     setIsPlaying((prev) => {
-  //       const updated = prev.includes(deviceId)
-  //         ? prev
-  //         : [...prev, deviceId];
-
-  //       sessionStorage.setItem(
-  //         "playingDevices",
-  //         JSON.stringify(updated)
-  //       );
-  //       return updated;
-  //     });
-  //   } catch (error) {
-  //     console.error("Play API Error:", error);
-  //     alert("Play failed — check console");
-  //   }
-  // };
-
-
-  // const stopAds = async (companyId, locationId, deviceId) => {
-  //   try {
-  //     await axios.post(`${API_URL}/advertisement/stop`, {
-  //       companyId,
-  //       deviceId,   // ✅ MUST SEND THIS
-  //     });
-
-  //     setIsPlaying((prev) => {
-  //       const updated = prev.filter((id) => id !== deviceId);
-  //       sessionStorage.setItem(
-  //         "playingDevices",   // ✅ KEEP SAME KEY
-  //         JSON.stringify(updated)
-  //       );
-  //       return updated;
-  //     });
-  //   } catch (error) {
-  //     console.error("Stop API Error:", error);
-  //     alert("Stop failed — check console");
-  //   }
-  // };
 
   const playAllInLocation = async (companyId, locationId, deviceIds = []) => {
     try {
@@ -145,6 +102,26 @@ export default function AdvertisementList() {
     } catch (error) {
       console.error("Stop All Error:", error);
       alert("Stop All failed — check console");
+    }
+  };
+  const pauseAllInLocation = async (companyId, locationId, deviceIds = []) => {
+    try {
+      for (const deviceId of deviceIds) {
+        await api.post("/advertisement/pause", {
+          companyId,
+          deviceId,
+        });
+      }
+
+      setPausedDevices((prev) => {
+        const updated = Array.from(new Set([...prev, ...deviceIds]));
+        sessionStorage.setItem("pausedDevices", JSON.stringify(updated));
+        return updated;
+      });
+
+    } catch (error) {
+      console.error("Pause All Error:", error);
+      alert("Pause failed");
     }
   };
 
@@ -228,7 +205,7 @@ export default function AdvertisementList() {
                 <td className="p-2 border">
                   {Array.isArray(ad.deviceId) && ad.deviceId.length > 0
                     ? ad.deviceId
-                      .map((mac) => deviceMap[mac] || mac) // 👈 convert MAC → Name
+                      .map((mac) => deviceMap[mac] || mac)
                       .join(", ")
                     : "-"}
                 </td>
@@ -275,7 +252,7 @@ export default function AdvertisementList() {
                     </button>
 
                     {/* 🔥 SINGLE TOGGLE BUTTON (Play All / Stop All) */}
-                    {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 && (
+                    {/* {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 && (
                       <div className="mb-2">
                         {isLocationPlaying(ad.deviceId) ? (
                           <button
@@ -305,8 +282,55 @@ export default function AdvertisementList() {
                           </button>
                         )}
                       </div>
-                    )}
+                    )} */}
 
+                    {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 && (
+                      <div className="flex gap-2">
+
+                        {/* ▶ PLAY */}
+                        <button
+                          onClick={() =>
+                            playAllInLocation(
+                              ad.company_id?._id,
+                              ad.location_id?._id,
+                              ad.deviceId
+                            )
+                          }
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                        >
+                          ▶ Play
+                        </button>
+
+                        {/* ⏸ PAUSE */}
+                        <button
+                          onClick={() =>
+                            pauseAllInLocation(
+                              ad.company_id?._id,
+                              ad.location_id?._id,
+                              ad.deviceId
+                            )
+                          }
+                          className="bg-yellow-500 text-white px-3 py-1 rounded text-sm"
+                        >
+                          ⏸ Pause
+                        </button>
+
+                        {/* ⛔ STOP */}
+                        <button
+                          onClick={() =>
+                            stopAllInLocation(
+                              ad.company_id?._id,
+                              ad.location_id?._id,
+                              ad.deviceId
+                            )
+                          }
+                          className="bg-red-600 text-white px-3 py-1 rounded text-sm"
+                        >
+                          ⛔ Stop
+                        </button>
+
+                      </div>
+                    )}
 
                   </div>
                 </td>
