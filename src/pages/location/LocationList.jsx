@@ -72,11 +72,17 @@ export default function LocationList() {
                   Edit
                 </Link>
                 <button
-                  onClick={() => deleteLocation(l._id)}
+                  onClick={async () => {
+                    await deleteLocation(l._id);
+
+                    // refresh list
+                    setLocations((prev) => prev.filter((loc) => loc._id !== l._id));
+                  }}
                   className="text-red-600"
                 >
                   Delete
                 </button>
+
               </td>
             </tr>
           ))}

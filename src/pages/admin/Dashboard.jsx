@@ -8,6 +8,15 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liveScreens, setLiveScreens] = useState([]);
+  const groupedScreens = liveScreens.reduce((acc, screen) => {
+    const company = screen.companyName || "Unknown Company";
+
+    if (!acc[company]) acc[company] = [];
+
+    acc[company].push(screen);
+
+    return acc;
+  }, {});
 
   /* ===============================
      Fetch Dashboard Stats
@@ -77,55 +86,63 @@ export default function AdminDashboard() {
         {liveScreens.length === 0 ? (
           <p className="text-gray-500">No live screens currently.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {liveScreens.map((screen) => {
+          <div>
+            {Object.entries(groupedScreens).map(([company, screens]) => (
+              <div key={company} className="mb-10">
 
-              const videoUrl = screen.currentVideo
-                ? `${SOCKET_BASE_URL}${screen.currentVideo}`
-                : null;
+                {/* 🔥 Company header */}
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xl font-bold text-blue-700">
+                    {company}
+                  </h3>
 
-              return (
-                <div
-                  key={screen.deviceId}
-                  className="border rounded shadow bg-white p-3"
-                >
-                  {screen.currentVideo === "PAUSED" ? (
-                    <div className="w-full h-56 bg-yellow-500 flex items-center justify-center text-white font-bold">
-                      ⏸ Paused
-                    </div>
-                  ) : screen.currentVideo ? (
-                    <video
-                      key={screen.deviceId}
-                      src={`${SOCKET_BASE_URL}${screen.currentVideo}`}
-                      className="w-full h-56 object-contain bg-black"
-                      muted
-                      autoPlay
-                      loop
-                      playsInline
-                    />
-                  ) : (
-                    <div className="w-full h-56 bg-gray-500 flex items-center justify-center text-white">
-                      Inactive
-                    </div>
-                  )}
-
-
-
-                  <div className="mt-2 text-center">
-                    <p className="font-semibold">
-                      {screen.locationName || "Unknown Location"}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Device: {screen.deviceId}
-                    </p>
-                  </div>
+                  <span className="text-sm text-gray-500">
+                    Screens: {screens.length}
+                  </span>
                 </div>
-              );
-            })}
+
+                {/* 🔥 Screens grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {screens.map((screen) => (
+                    <div
+                      key={screen.deviceId}
+                      className="border rounded shadow bg-white p-3"
+                    >
+                      {screen.currentVideo === "PAUSED" ? (
+                        <div className="w-full h-56 bg-yellow-500 flex items-center justify-center text-white font-bold">
+                          ⏸ Paused
+                        </div>
+                      ) : screen.currentVideo ? (
+                        <video
+                          src={`${SOCKET_BASE_URL}${screen.currentVideo}`}
+                          className="w-full h-56 object-contain bg-black"
+                          muted
+                          autoPlay
+                          loop
+                          playsInline
+                        />
+                      ) : (
+                        <div className="w-full h-56 bg-gray-500 flex items-center justify-center text-white">
+                          Inactive
+                        </div>
+                      )}
+
+                      <div className="mt-2 text-center">
+                        <p className="font-semibold">
+                          {screen.locationName || "Unknown Location"}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Device: {screen.deviceId}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
-
       {/* ===============================
           Quick Actions
       =============================== */}

@@ -32,9 +32,8 @@ export default function AdvertisementList() {
 
       const map = {};
       (deviceRes.data.data || []).forEach((d) => {
-        map[d.deviceId] = d.deviceName; // 🔥 KEY FIX
+        map[d.deviceId] = d; // ✅ full device
       });
-
       setDeviceMap(map);
 
     } catch (err) {
@@ -166,46 +165,46 @@ export default function AdvertisementList() {
               <tr key={ad._id}>
                 <td className="p-2 border">{ad.title}</td>
                 <td className="p-2 border">
-                  {ad.company_id?.name || "-"}
+                  {Array.isArray(ad.company_ids) && ad.company_ids.length > 0
+                    ? ad.company_ids.map((c) => c.name).join(", ")
+                    : "-"}
                 </td>
+
                 <td className="p-2 border">
-                  {ad.location_id?.name || "-"}
+                  {Array.isArray(ad.location_ids) && ad.location_ids.length > 0
+                    ? ad.location_ids.map((l) => l.name).join(", ")
+                    : "-"}
                 </td>
+
 
                 <td className="p-2 border">
                   <div className="flex flex-col gap-1">
-                    {/* 🔥 AUTO MODE LINK */}
-                    <a
-                      href={`/screen/${ad.location_id?._id}`}
-                      target="_blank"
-                      className="text-blue-600 hover:underline text-sm font-semibold"
-                    >
-                      /screen/{ad.location_id?._id}  (Auto Screen)
-                    </a>
+                    {Array.isArray(ad.deviceId) &&
+                      ad.deviceId.map((mac) => {
+                        const device = deviceMap[mac];
 
-                    {/* 🔹 MANUAL MODE LINKS (your existing ones) */}
-                    {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 &&
-                      ad.deviceId.map((mac) => (
-                        <a
-                          key={mac}
-                          href={`/screen/${ad.location_id?._id}/${encodeURIComponent(mac)}`}
-                          target="_blank"
-                          className="text-purple-600 hover:underline text-sm"
-                        >
-                          /screen/{ad.location_id?._id}/{mac}
-                        </a>
-                      ))
-                    }
+                        if (!device?.screenToken) return null;
+
+                        return (
+                          <a
+                            key={mac}
+                            href={`/screen/${device.screenToken}`}
+                            target="_blank"
+                            className="text-purple-600 hover:underline text-sm"
+                          >
+                            /screen/{device.screenToken}
+                          </a>
+                        );
+                      })}
                   </div>
                 </td>
-
 
 
                 {/* ✅ FIXED: Show multiple devices properly */}
                 <td className="p-2 border">
                   {Array.isArray(ad.deviceId) && ad.deviceId.length > 0
                     ? ad.deviceId
-                      .map((mac) => deviceMap[mac] || mac)
+                      .map((mac) => deviceMap[mac]?.deviceName || mac)
                       .join(", ")
                     : "-"}
                 </td>
@@ -291,10 +290,11 @@ export default function AdvertisementList() {
                         <button
                           onClick={() =>
                             playAllInLocation(
-                              ad.company_id?._id,
-                              ad.location_id?._id,
+                              ad.company_ids?.[0]?._id,
+                              ad.location_ids?.[0]?._id,
                               ad.deviceId
                             )
+
                           }
                           className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
                         >
@@ -305,8 +305,9 @@ export default function AdvertisementList() {
                         <button
                           onClick={() =>
                             pauseAllInLocation(
-                              ad.company_id?._id,
-                              ad.location_id?._id,
+                              ad.company_ids?.[0]?._id,
+                              ad.location_ids?.[0]?._id,
+
                               ad.deviceId
                             )
                           }
@@ -319,8 +320,9 @@ export default function AdvertisementList() {
                         <button
                           onClick={() =>
                             stopAllInLocation(
-                              ad.company_id?._id,
-                              ad.location_id?._id,
+                              ad.company_ids?.[0]?._id,
+                              ad.location_ids?.[0]?._id,
+
                               ad.deviceId
                             )
                           }

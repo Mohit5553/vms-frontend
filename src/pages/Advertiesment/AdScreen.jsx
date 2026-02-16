@@ -5,7 +5,8 @@ import api from "../../api/axios";
 import { SOCKET_BASE_URL } from "../../config";
 
 export default function AdScreen() {
-  const { locationId, deviceId: urlDeviceId } = useParams();
+  /* 🔥 NEW → GET TOKEN FROM URL */
+  const { token } = useParams();
 
   const videoRef = useRef(null);
   const socketRef = useRef(null);
@@ -16,38 +17,41 @@ export default function AdScreen() {
   const resumeTimeRef = useRef(0);
 
   const [DEVICE_ID, setDEVICE_ID] = useState(null);
+  const [locationId, setLocationId] = useState(null);
   const [playlist, setPlaylist] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  /* ================= DEVICE ID ================= */
-
-  const getFinalDeviceId = async () => {
-    if (urlDeviceId) return decodeURIComponent(urlDeviceId);
-
-    let saved = localStorage.getItem("TV_DEVICE_ID");
-    if (saved) return saved;
-
-    const newId = "TV-" + Math.random().toString(36).substring(2, 10);
-    localStorage.setItem("TV_DEVICE_ID", newId);
-    return newId;
-  };
+  /* ================= LOAD DEVICE FROM TOKEN ================= */
 
   useEffect(() => {
-    (async () => {
-      const id = await getFinalDeviceId();
-      setDEVICE_ID(id);
-    })();
-  }, [urlDeviceId]);
+    if (!token) return;
+
+    api
+      .get(`/devices/by-token/${token}`)
+      .then((res) => {
+        const device = res.data.data;
+
+        setDEVICE_ID(device.deviceId);
+
+        // 🔥 If multiple locations, pick first
+        if (device.location_id?.length) {
+          setLocationId(device.location_id[0]._id);
+        }
+      })
+      .catch(console.error);
+  }, [token]);
 
   /* ================= REGISTER DEVICE ================= */
 
   useEffect(() => {
     if (!DEVICE_ID) return;
 
-    api.post("/devices/register", {
-      deviceId: DEVICE_ID,
-      deviceName: `TV-${DEVICE_ID.slice(-4)}`,
-    }).catch(console.error);
+    api
+      .post("/devices/register", {
+        deviceId: DEVICE_ID,
+        deviceName: `TV-${DEVICE_ID.slice(-4)}`,
+      })
+      .catch(console.error);
   }, [DEVICE_ID]);
 
   /* ================= SOCKET ================= */
@@ -65,11 +69,12 @@ export default function AdScreen() {
     socket.on("connect", () => {
       console.log("Connected:", socket.id);
 
-      socket.emit("register_device", {
-        deviceId: DEVICE_ID,
-        locationId,
-      });
-
+      if (DEVICE_ID) {
+        socket.emit("register_device", {
+          deviceId: DEVICE_ID,
+          locationId: locationId || null,
+        });
+      }
 
     });
 
@@ -79,10 +84,8 @@ export default function AdScreen() {
 
       console.log("PLAY event");
 
-      // 🔥 RESUME ONLY (no reload)
+      // 🔥 Resume logic
       if (isPausedRef.current) {
-        console.log("Resuming from:", resumeTimeRef.current);
-
         isPausedRef.current = false;
 
         if (videoRef.current) {
@@ -90,19 +93,17 @@ export default function AdScreen() {
           videoRef.current.play().catch(console.error);
         }
 
-        // 🔥 VERY IMPORTANT → update dashboard
         if (socketRef.current && ads?.length) {
           socketRef.current.emit("playing_video", {
             deviceId: DEVICE_ID,
-            videoPath: ads[currentIndex]?.videoPath || ads[0].videoPath,
+            videoPath:
+              ads[currentIndex]?.videoPath || ads[0].videoPath,
           });
         }
 
         return;
       }
 
-
-      // 🔥 Prevent playlist reload
       if (playerLoadedRef.current) return;
 
       playerLoadedRef.current = true;
@@ -113,26 +114,19 @@ export default function AdScreen() {
 
     /* ===== PAUSE ===== */
     socket.on("pause_ads", () => {
-      console.log("PAUSE event");
-
       if (videoRef.current) {
-        const time = videoRef.current.currentTime;
-
-        resumeTimeRef.current = time;
+        resumeTimeRef.current =
+          videoRef.current.currentTime;
         videoRef.current.pause();
       }
 
       isPausedRef.current = true;
 
-      // 🔥 Notify dashboard
-      if (socketRef.current) {
-        socketRef.current.emit("playing_video", {
-          deviceId: DEVICE_ID,
-          videoPath: "PAUSED",
-        });
-      }
+      socketRef.current.emit("playing_video", {
+        deviceId: DEVICE_ID,
+        videoPath: "PAUSED",
+      });
     });
-
 
     /* ===== STOP ===== */
     socket.on("stop_ads", () => {
@@ -143,14 +137,11 @@ export default function AdScreen() {
       setPlaylist([]);
       setCurrentIndex(0);
 
-      if (socketRef.current) {
-        socketRef.current.emit("playing_video", {
-          deviceId: DEVICE_ID,
-          videoPath: null,
-        });
-      }
+      socketRef.current.emit("playing_video", {
+        deviceId: DEVICE_ID,
+        videoPath: null,
+      });
     });
-
 
     return () => socket.disconnect();
   }, [DEVICE_ID, locationId]);
@@ -161,31 +152,21 @@ export default function AdScreen() {
     if (!playlist.length || !videoRef.current) return;
 
     const currentAd = playlist[currentIndex];
-    const videoUrl = `${SOCKET_BASE_URL}${currentAd.videoPath}`;
+    const videoUrl =
+      `${SOCKET_BASE_URL}${currentAd.videoPath}`;
 
-    // Load only if different
     if (videoRef.current.src !== videoUrl) {
-      console.log("Loading video:", videoUrl);
       videoRef.current.src = videoUrl;
     }
 
+    videoRef.current.muted = true;
     videoRef.current.play().catch(console.error);
 
-    // 🔥 VERY IMPORTANT → notify backend
-    if (socketRef.current) {
-      socketRef.current.emit("playing_video", {
-        deviceId: DEVICE_ID,
-        videoPath: currentAd.videoPath,
-      });
-    }
-
+    socketRef.current?.emit("playing_video", {
+      deviceId: DEVICE_ID,
+      videoPath: currentAd.videoPath,
+    });
   }, [playlist, currentIndex, DEVICE_ID]);
-
-  // const handleEnded = () => {
-  //   setCurrentIndex((prev) =>
-  //     prev + 1 >= playlist.length ? 0 : prev + 1
-  //   );
-  // };
 
   /* ================= UI ================= */
 
@@ -201,8 +182,6 @@ export default function AdScreen() {
             playsInline
             loop
           />
-
-
 
           {/* 🔥 ticker */}
           <div className="absolute bottom-4 left-0 w-full bg-black/50 py-2 overflow-hidden">

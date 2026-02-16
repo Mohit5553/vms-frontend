@@ -17,6 +17,20 @@ const AdvertisementForm = ({ initialData = null }) => {
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
   const [videoFile, setVideoFile] = useState(null);
+  // COMPANY SEARCH
+  const [companySearch, setCompanySearch] = useState("");
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+
+  // LOCATION SEARCH
+  const [locationSearch, setLocationSearch] = useState("");
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const filteredCompanies = companies.filter((c) =>
+    c.name.toLowerCase().includes(companySearch.toLowerCase())
+  );
+
+  const filteredLocations = locations.filter((l) =>
+    l.name.toLowerCase().includes(locationSearch.toLowerCase())
+  );
 
   // === DEVICE STATES ===
   const [devices, setDevices] = useState([]);
@@ -24,19 +38,16 @@ const AdvertisementForm = ({ initialData = null }) => {
   const [showDeviceDropdown, setShowDeviceDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
-    company_id: initialData?.company_id?._id || "",
-    location_id: initialData?.location_id?._id || "",
-    deviceId: initialData?.deviceId
-      ? Array.isArray(initialData.deviceId)
-        ? initialData.deviceId
-        : [initialData.deviceId]
-      : [],
+    company_ids: initialData?.company_ids || [],
+    location_ids: initialData?.location_ids || [],
+    deviceIds: initialData?.deviceIds || [],
     title: initialData?.title || "",
     description: initialData?.description || "",
     startDate: initialData?.startDate?.slice(0, 10) || "",
     endDate: initialData?.endDate?.slice(0, 10) || "",
     playOrder: initialData?.playOrder || 1,
   });
+
 
   /* ---------------- Load Companies ---------------- */
   useEffect(() => {
@@ -45,19 +56,23 @@ const AdvertisementForm = ({ initialData = null }) => {
 
   /* ---------------- Load Locations by Company ---------------- */
   useEffect(() => {
-    if (formData.company_id) {
-      getLocationsByCompany(formData.company_id).then((res) =>
-        setLocations(res.data.data)
-      );
-    } else {
+    if (!formData.company_ids.length) {
       setLocations([]);
+      return;
     }
-  }, [formData.company_id]);
+
+    Promise.all(
+      formData.company_ids.map((id) => getLocationsByCompany(id))
+    ).then((responses) => {
+      const all = responses.flatMap((r) => r.data.data);
+      setLocations(all);
+    });
+  }, [formData.company_ids]);
 
   /* ---------------- Load Devices by Location ---------------- */
   /* ---------------- Load Devices by Location ---------------- */
   useEffect(() => {
-    if (!formData.location_id) {
+    if (!formData.location_ids?.length) {
       setDevices([]);
       return;
     }
@@ -66,12 +81,15 @@ const AdvertisementForm = ({ initialData = null }) => {
       .get("/devices/list")
       .then((res) => {
         const filtered = (res.data.data || []).filter((d) =>
-          d.location_id?.some((loc) => loc._id === formData.location_id)
+          d.location_id?.some((loc) =>
+            formData.location_ids.includes(loc._id)
+          )
         );
+
         setDevices(filtered);
       })
       .catch((err) => console.error("Device fetch error:", err));
-  }, [formData.location_id]);
+  }, [formData.location_ids]);   // ✅ correct dependency
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -87,18 +105,50 @@ const AdvertisementForm = ({ initialData = null }) => {
   const filteredDevices = devices.filter((d) =>
     d.deviceId.toLowerCase().includes(deviceSearch.toLowerCase())
   );
+  const toggleCompany = (id) => {
+    setFormData(prev => {
+      const exists = prev.company_ids.includes(id);
+      return {
+        ...prev,
+        company_ids: exists
+          ? prev.company_ids.filter(x => x !== id)
+          : [...prev.company_ids, id],
+        location_ids: [],
+        deviceIds: [],
+      };
+    });
+
+    setShowCompanyDropdown(false);
+  };
+
+
+  const toggleLocation = (id) => {
+    setFormData((prev) => {
+      const exists = prev.location_ids.includes(id);
+
+      return {
+        ...prev,
+        location_ids: exists
+          ? prev.location_ids.filter((x) => x !== id)
+          : [...prev.location_ids, id],
+        deviceIds: [],
+      };
+    });
+  };
 
   const toggleDevice = (deviceId) => {
     setFormData((prev) => {
-      const exists = prev.deviceId.includes(deviceId);
+      const exists = prev.deviceIds.includes(deviceId);
 
-      const newDevices = exists
-        ? prev.deviceId.filter((id) => id !== deviceId)
-        : [...prev.deviceId, deviceId];
-
-      return { ...prev, deviceId: newDevices };
+      return {
+        ...prev,
+        deviceIds: exists
+          ? prev.deviceIds.filter((x) => x !== deviceId)
+          : [...prev.deviceIds, deviceId],
+      };
     });
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -106,11 +156,12 @@ const AdvertisementForm = ({ initialData = null }) => {
     const payload = new FormData();
 
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === "deviceId") {
-        payload.append(key, JSON.stringify(value)); // send array properly
+      if (["company_ids", "location_ids", "deviceIds"].includes(key)) {
+        payload.append(key, JSON.stringify(value));
       } else {
         payload.append(key, value);
       }
+
     });
 
     if (videoFile) {
@@ -131,6 +182,17 @@ const AdvertisementForm = ({ initialData = null }) => {
       alert(error?.response?.data?.message || "Something went wrong");
     }
   };
+  useEffect(() => {
+    if (!showCompanyDropdown) setCompanySearch("");
+  }, [showCompanyDropdown]);
+
+  useEffect(() => {
+    if (!showLocationDropdown) setLocationSearch("");
+  }, [showLocationDropdown]);
+
+  useEffect(() => {
+    if (!showDeviceDropdown) setDeviceSearch("");
+  }, [showDeviceDropdown]);
 
   return (
     <form
@@ -143,24 +205,134 @@ const AdvertisementForm = ({ initialData = null }) => {
       </h2>
 
       {/* Company */}
-      <Select
-        label="Company"
-        name="company_id"
-        required
-        value={formData.company_id}
-        onChange={handleChange}
-        options={companies}
-      />
+      {/* COMPANY MULTI SELECT */}
+      <div className="mb-4 relative">
+        <label className="block mb-1 font-medium">Select Companies</label>
+
+        <div
+          className="w-full border rounded px-3 py-2 cursor-pointer bg-white"
+          onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
+        >
+          {formData.company_ids.length > 0
+            ? companies
+              .filter(c => formData.company_ids.includes(c._id))
+              .map(c => c.name)
+              .join(", ")
+
+            : "Search and select companies..."}
+        </div>
+
+        {showCompanyDropdown && (
+          <div className="absolute left-0 right-0 bg-white border rounded mt-1 max-h-60 overflow-auto shadow z-10 p-2">
+
+            <input
+              type="text"
+              placeholder="Search company..."
+              value={companySearch}
+              onChange={(e) => setCompanySearch(e.target.value)}
+              className="w-full border rounded px-2 py-1 mb-2"
+            />
+
+            {filteredCompanies.length > 0 ? (
+              filteredCompanies.map((c) => {
+                const checked = formData.company_ids.includes(c._id);
+
+                return (
+                  <label
+                    key={c._id}
+                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleCompany(c._id)}
+                    />
+                    {c.name}
+                  </label>
+                );
+              })
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-gray-500">No company found</p>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/companies/new")}
+                  className="mt-2 px-3 py-1 bg-blue-600 text-white rounded"
+                >
+                  + Add Company
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
 
       {/* Location */}
-      <Select
-        label="Location"
-        name="location_id"
-        required
-        value={formData.location_id}
-        onChange={handleChange}
-        options={locations}
-      />
+      {/* LOCATION MULTI SELECT */}
+      <div className="mb-4 relative">
+        <label className="block mb-1 font-medium">Select Locations</label>
+
+        <div
+          className="w-full border rounded px-3 py-2 cursor-pointer bg-white"
+          onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+        >
+          {formData.location_ids.length > 0
+            ? locations
+              .filter(l => formData.location_ids.includes(l._id))
+              .map(l => l.name)
+              .join(", ")
+
+            : "Search and select locations..."}
+        </div>
+
+        {showLocationDropdown && (
+          <div className="absolute left-0 right-0 bg-white border rounded mt-1 max-h-60 overflow-auto shadow z-10 p-2">
+
+            <input
+              type="text"
+              placeholder="Search location..."
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+              className="w-full border rounded px-2 py-1 mb-2"
+            />
+
+            {filteredLocations.length > 0 ? (
+              filteredLocations.map((l) => {
+                const checked = formData.location_ids.includes(l._id);
+
+                return (
+                  <label
+                    key={l._id}
+                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleLocation(l._id)}
+                    />
+                    {l.name}
+                  </label>
+                );
+              })
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-gray-500">No location found</p>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/locations/new")}
+                  className="mt-2 px-3 py-1 bg-blue-600 text-white rounded"
+                >
+                  + Add Location
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
 
       {/* DEVICE MULTI SELECT WITH SEARCH */}
       <div className="mb-4 relative">
@@ -170,9 +342,10 @@ const AdvertisementForm = ({ initialData = null }) => {
           className="w-full border rounded px-3 py-2 cursor-pointer bg-white"
           onClick={() => setShowDeviceDropdown(!showDeviceDropdown)}
         >
-          {formData.deviceId.length > 0
-            ? formData.deviceId.join(", ")
+          {formData.deviceIds.length > 0
+            ? formData.deviceIds.join(", ")
             : "Search and select devices..."}
+
         </div>
 
         {showDeviceDropdown && (
@@ -187,7 +360,7 @@ const AdvertisementForm = ({ initialData = null }) => {
 
             {filteredDevices.length > 0 ? (
               filteredDevices.map((d) => {
-                const isChecked = formData.deviceId.includes(d.deviceId);
+                const isChecked = formData.deviceIds.includes(d.deviceId);
 
                 return (
                   <label

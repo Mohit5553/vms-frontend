@@ -15,18 +15,30 @@ export default function AdvertisementEdit() {
         setLoading(true);
         const res = await getAdvertisementById(id);
 
-        // Normalize deviceId to array (VERY IMPORTANT for your form)
         const data = res.data.data;
 
         const normalizedAd = {
           ...data,
-          deviceId: Array.isArray(data.deviceId)
-            ? data.deviceId
-            : data.deviceId
-              ? [data.deviceId]
-              : [],
+
+          company_ids: data.company_ids?.map(c =>
+            typeof c === "string" ? c : c._id
+          ) || [],
+
+          location_ids: data.location_ids?.map(l =>
+            typeof l === "string" ? l : l._id
+          ) || [],
+
+          deviceIds: (data.deviceIds?.length
+            ? data.deviceIds
+            : data.deviceId || []
+          ).map(d => (typeof d === "string" ? d : d.deviceId)),
+
+          startDate: data.startDate?.slice(0, 10),
+          endDate: data.endDate?.slice(0, 10),
         };
 
+
+        console.log("Fetched ad:", normalizedAd);
         setAd(normalizedAd);
       } catch (err) {
         console.error("Error fetching advertisement:", err);
@@ -38,6 +50,7 @@ export default function AdvertisementEdit() {
 
     fetchAd();
   }, [id]);
+
 
   if (loading) return <p className="p-6">Loading advertisement...</p>;
   if (error) return <p className="p-6 text-red-600">{error}</p>;
