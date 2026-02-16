@@ -94,9 +94,10 @@ export default function App() {
             {/* <Route path="/screen" element={<AdScreen />} /> */}
             {/* <Route path="/screen/:locationId" element={<AdScreen />} /> */}
             {/* <Route path="/screen/:mac" element={<AdScreen />} /> */}
-            <Route path="/screen/:locationId/:deviceId" element={<AdScreen />} />
-            <Route path="/screen/:locationId" element={<AdScreen />} />
             {/* <Route path="/screen/:locationId/:deviceId" element={<AdScreen />} /> */}
+            {/* <Route path="/screen/:locationId" element={<AdScreen />} /> */}
+            <Route path="/screen/:token" element={<AdScreen />} />
+
 
             <Route path="/add-device" element={<AddDevice />} />
             <Route path="/devices" element={<DeviceList />} />
