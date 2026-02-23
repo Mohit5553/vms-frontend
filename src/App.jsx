@@ -1,8 +1,8 @@
-import React from "react";
-import "./index.css";
-
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import React, { useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+// import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contextAuth/AuthContext";
+import "./index.css";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -41,6 +41,18 @@ import DeviceList from "./pages/Device/DeviceList";
 ========================= */
 function Layout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  /* ✅ Smart TV fallback */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const screenToken = params.get("screen");
+
+    // If TV opens ?screen=token → redirect to correct route
+    if (screenToken && !location.pathname.startsWith("/screen")) {
+      navigate(`/screen/${screenToken}`, { replace: true });
+    }
+  }, [location, navigate]);
 
   // Hide Navbar & Footer ONLY on /screen
   const hideLayout = location.pathname.startsWith("/screen");
@@ -49,10 +61,7 @@ function Layout({ children }) {
     <div className="min-h-screen flex flex-col">
       {!hideLayout && <Navbar />}
 
-      {/* THIS WRAPPER IS VERY IMPORTANT */}
-      <div className="flex-1 w-full">
-        {children}
-      </div>
+      <div className="flex-1 w-full">{children}</div>
 
       {!hideLayout && <Footer />}
     </div>
