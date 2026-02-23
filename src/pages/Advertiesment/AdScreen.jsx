@@ -84,7 +84,11 @@ export default function AdScreen() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "visible" && videoRef.current) {
+      if (
+        document.visibilityState === "visible" &&
+        videoRef.current &&
+        !isPausedRef.current // 🔥 important
+      ) {
         videoRef.current.play().catch(() => { });
       }
     };
@@ -264,6 +268,23 @@ export default function AdScreen() {
 
     return () => clearInterval(interval);
   }, [DEVICE_ID, playlist, currentIndex]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const preventAutoPlay = () => {
+      if (isPausedRef.current) {
+        video.pause();
+      }
+    };
+
+    video.addEventListener("play", preventAutoPlay);
+
+    return () => {
+      video.removeEventListener("play", preventAutoPlay);
+    };
+  }, []);
   /* ================= VIDEO LOAD ================= */
   useEffect(() => {
     if (!playlist.length || !videoRef.current || !playlist[currentIndex]) return;
@@ -272,27 +293,22 @@ export default function AdScreen() {
     const currentAd = playlist[currentIndex];
     const newSrc = `${SOCKET_BASE_URL}${currentAd.videoPath}`;
 
-    // 🔥 better URL check
     if (!video.src || !video.src.endsWith(currentAd.videoPath)) {
-      video.pause();              // stop old video
-      video.removeAttribute("src"); // clear old source
+      video.pause();
+      video.removeAttribute("src");
       video.load();
 
       video.src = newSrc;
       video.currentTime = 0;
 
-      // 🔥 play when browser is ready
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => { });
+      // 🔥 IMPORTANT
+      if (!isPausedRef.current) {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => { });
+        }
       }
     }
-
-    socketRef.current?.emit("playing_video", {
-      deviceId: DEVICE_ID,
-      videoPath: currentAd.videoPath,
-      currentTime: video.currentTime,
-    });
 
   }, [playlist, currentIndex, DEVICE_ID]);
   /* ================= UI ================= */
