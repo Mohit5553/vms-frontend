@@ -15,13 +15,33 @@ export default function AdScreen() {
   const isPausedRef = useRef(false);
   const playerLoadedRef = useRef(false);
   const resumeTimeRef = useRef(0);
-
+  const audioUnlockedRef = useRef(false);
   const [DEVICE_ID, setDEVICE_ID] = useState(null);
   const [locationId, setLocationId] = useState(null);
   const [playlist, setPlaylist] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   /* ================= LOAD DEVICE FROM TOKEN ================= */
+  // useEffect(() => {
+  //   const enterFullscreen = () => {
+  //     const elem = document.documentElement;
+
+  //     if (elem.requestFullscreen) {
+  //       elem.requestFullscreen().catch(() => {
+  //         console.log("Fullscreen blocked");
+  //       });
+  //     }
+  //     document.body.addEventListener("keydown", () => {
+  //       if (videoRef.current) {
+  //         videoRef.current.muted = false;
+  //       }
+  //     });
+  //   };
+
+  //   enterFullscreen();
+  // }, []);
+
+
   useEffect(() => {
     const enterFullscreen = () => {
       const elem = document.documentElement;
@@ -29,10 +49,52 @@ export default function AdScreen() {
       if (elem.requestFullscreen) {
         elem.requestFullscreen().catch(() => { });
       }
+
+      // 🔥 unlock audio also
+      if (videoRef.current) {
+        videoRef.current.muted = false;
+      }
+
+      // remove after first use
+      document.removeEventListener("click", enterFullscreen);
+      document.removeEventListener("keydown", enterFullscreen);
+      document.removeEventListener("touchstart", enterFullscreen);
     };
 
-    enterFullscreen();
+    document.addEventListener("click", enterFullscreen);
+    document.addEventListener("keydown", enterFullscreen);
+    document.addEventListener("touchstart", enterFullscreen);
+
+    return () => {
+      document.removeEventListener("click", enterFullscreen);
+      document.removeEventListener("keydown", enterFullscreen);
+      document.removeEventListener("touchstart", enterFullscreen);
+    };
   }, []);
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (videoRef.current) {
+        videoRef.current.muted = false;
+      }
+      document.removeEventListener("click", unlockAudio);
+    };
+
+    document.addEventListener("click", unlockAudio);
+  }, []);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && videoRef.current) {
+        videoRef.current.play().catch(() => { });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
   useEffect(() => {
     if (!token) return;
 
@@ -98,8 +160,12 @@ export default function AdScreen() {
         isPausedRef.current = false;
 
         if (videoRef.current) {
-          videoRef.current.currentTime = resumeTimeRef.current;
-          safePlay();
+          const video = videoRef.current;
+
+          video.currentTime = resumeTimeRef.current;
+
+          // 🔥 Do NOT call safePlay again
+          video.play().catch(() => { });
         }
 
         if (socketRef.current && ads?.length) {
@@ -160,15 +226,24 @@ export default function AdScreen() {
     if (!video) return;
 
     try {
-      // 🔥 autoplay workaround for TV
-      video.muted = true;
-      await video.play();
+      // 🔥 Unlock sound only first time
+      if (!audioUnlockedRef.current) {
+        audioUnlockedRef.current = true;
 
-      // 🔥 enable sound
-      video.muted = false;
-      video.volume = 1;
+        video.muted = true;
+        await video.play();
+
+        setTimeout(() => {
+          video.muted = false;
+          video.volume = 1;
+        }, 1500);
+      } else {
+        // 🔥 Resume without changing mute
+        video.play().catch(() => { });
+      }
+
     } catch (e) {
-      console.log("Play blocked:", e);
+      console.log("Autoplay blocked:", e);
     }
   };
 
@@ -192,8 +267,7 @@ export default function AdScreen() {
   /* ================= VIDEO LOAD ================= */
 
   useEffect(() => {
-    if (!playlist.length || !videoRef.current) return;
-
+    if (!playlist.length || !videoRef.current || !playlist[currentIndex]) return;
     const currentAd = playlist[currentIndex];
 
     const video = videoRef.current;
@@ -201,15 +275,16 @@ export default function AdScreen() {
     if (!video) return;
 
     const newSrc = `${SOCKET_BASE_URL}${currentAd.videoPath}`;
-
     if (video.src !== newSrc) {
       video.src = newSrc;
       video.currentTime = 0;
+
+      video.onloadedmetadata = () => {
+        video.play().catch(() => { });
+      };
     }
 
-    setTimeout(() => {
-      safePlay();
-    }, 300);
+
     socketRef.current?.emit("playing_video", {
       deviceId: DEVICE_ID,
       videoPath: currentAd.videoPath,
@@ -217,10 +292,10 @@ export default function AdScreen() {
     });
   }, [playlist, currentIndex, DEVICE_ID]);
   /* ================= UI ================= */
-  console.log(
-    "VIDEO URL:",
-    `${SOCKET_BASE_URL}${playlist[currentIndex]?.videoPath}`
-  );
+  // console.log(
+  //   "VIDEO URL:",
+  //   `${SOCKET_BASE_URL}${playlist[currentIndex]?.videoPath}`
+  // );
   return (
     <div className="w-screen h-screen bg-black relative">
       {playlist.length ? (
@@ -230,7 +305,9 @@ export default function AdScreen() {
             className="w-full h-full object-cover"
             autoPlay
             playsInline
-            loop={playlist.length === 1}
+            controls={false}
+            disablePictureInPicture
+            preload="auto"
             onEnded={() => {
               if (playlist.length > 1) {
                 setCurrentIndex((prev) => (prev + 1) % playlist.length);
