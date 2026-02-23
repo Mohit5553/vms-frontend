@@ -265,31 +265,35 @@ export default function AdScreen() {
     return () => clearInterval(interval);
   }, [DEVICE_ID, playlist, currentIndex]);
   /* ================= VIDEO LOAD ================= */
-
   useEffect(() => {
     if (!playlist.length || !videoRef.current || !playlist[currentIndex]) return;
-    const currentAd = playlist[currentIndex];
 
     const video = videoRef.current;
-
-    if (!video) return;
-
+    const currentAd = playlist[currentIndex];
     const newSrc = `${SOCKET_BASE_URL}${currentAd.videoPath}`;
-    if (video.src !== newSrc) {
+
+    // 🔥 better URL check
+    if (!video.src || !video.src.endsWith(currentAd.videoPath)) {
+      video.pause();              // stop old video
+      video.removeAttribute("src"); // clear old source
+      video.load();
+
       video.src = newSrc;
       video.currentTime = 0;
 
-      video.onloadedmetadata = () => {
-        video.play().catch(() => { });
-      };
+      // 🔥 play when browser is ready
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => { });
+      }
     }
-
 
     socketRef.current?.emit("playing_video", {
       deviceId: DEVICE_ID,
       videoPath: currentAd.videoPath,
-      currentTime: videoRef.current.currentTime,
+      currentTime: video.currentTime,
     });
+
   }, [playlist, currentIndex, DEVICE_ID]);
   /* ================= UI ================= */
   // console.log(
@@ -304,6 +308,7 @@ export default function AdScreen() {
             ref={videoRef}
             className="w-full h-full object-cover"
             autoPlay
+            loop={playlist.length === 1}  // 🔥 loop only single video
             playsInline
             controls={false}
             disablePictureInPicture
