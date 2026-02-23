@@ -22,7 +22,17 @@ export default function AdScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   /* ================= LOAD DEVICE FROM TOKEN ================= */
+  useEffect(() => {
+    const enterFullscreen = () => {
+      const elem = document.documentElement;
 
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(() => { });
+      }
+    };
+
+    enterFullscreen();
+  }, []);
   useEffect(() => {
     if (!token) return;
 
@@ -145,12 +155,20 @@ export default function AdScreen() {
   }, [DEVICE_ID, locationId]);
 
 
-  const safePlay = () => {
+  const safePlay = async () => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (video.paused) {
-      video.play().catch(() => { });
+    try {
+      // 🔥 autoplay workaround for TV
+      video.muted = true;
+      await video.play();
+
+      // 🔥 enable sound
+      video.muted = false;
+      video.volume = 1;
+    } catch (e) {
+      console.log("Play blocked:", e);
     }
   };
 
@@ -189,7 +207,9 @@ export default function AdScreen() {
       video.currentTime = 0;
     }
 
-    safePlay();
+    setTimeout(() => {
+      safePlay();
+    }, 300);
     socketRef.current?.emit("playing_video", {
       deviceId: DEVICE_ID,
       videoPath: currentAd.videoPath,
@@ -207,9 +227,8 @@ export default function AdScreen() {
         <>
           <video
             ref={videoRef}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
             autoPlay
-            muted
             playsInline
             loop={playlist.length === 1}
             onEnded={() => {

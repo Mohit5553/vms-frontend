@@ -1,11 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 const DeviceList = () => {
     const navigate = useNavigate();
     const [devices, setDevices] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    const [search, setSearch] = useState("");
+    const [sortField, setSortField] = useState("");
+    const [sortDirection, setSortDirection] = useState("asc");
+    const [page, setPage] = useState(1);
+    const itemsPerPage = 5;
 
     const fetchDevices = async () => {
         try {
@@ -35,80 +42,201 @@ const DeviceList = () => {
         }
     };
 
-    return (
-        <div className="max-w-6xl mx-auto mt-8 p-6 bg-white shadow rounded">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold">Device List</h2>
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+        } else {
+            setSortField(field);
+            setSortDirection("asc");
+        }
+        setPage(1);
+    };
 
-                <button
-                    onClick={() => navigate("/add-device")}
-                    className="px-4 py-2 bg-blue-600 text-white rounded"
-                >
-                    + Add Device
-                </button>
+    /* 🔍 Search */
+    const filteredDevices = useMemo(() => {
+        return devices.filter((d) =>
+            d.deviceName?.toLowerCase().includes(search.toLowerCase())
+        );
+    }, [devices, search]);
+
+    /* 🔽 Sorting */
+    const sortedDevices = useMemo(() => {
+        if (!sortField) return filteredDevices;
+
+        return [...filteredDevices].sort((a, b) => {
+            const aVal = a[sortField] || "";
+            const bVal = b[sortField] || "";
+
+            return sortDirection === "asc"
+                ? String(aVal).localeCompare(String(bVal))
+                : String(bVal).localeCompare(String(aVal));
+        });
+    }, [filteredDevices, sortField, sortDirection]);
+
+    /* 📄 Pagination */
+    const paginatedDevices = useMemo(() => {
+        return sortedDevices.slice(
+            (page - 1) * itemsPerPage,
+            page * itemsPerPage
+        );
+    }, [sortedDevices, page]);
+
+    /* Skeleton loading */
+    if (loading) {
+        return (
+            <div className="p-6 space-y-3">
+                {[...Array(6)].map((_, i) => (
+                    <div
+                        key={i}
+                        className="h-12 bg-gray-200 rounded animate-pulse"
+                    />
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            {/* Header + Search */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                    <h2 className="text-xl sm:text-2xl font-semibold">Devices</h2>
+                    <p className="text-gray-500 text-sm">
+                        Manage and control your screen devices
+                    </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                    <input
+                        value={search}
+                        onChange={(e) => {
+                            setSearch(e.target.value);
+                            setPage(1);
+                        }}
+                        placeholder="Search devices..."
+                        className="border px-3 py-2 rounded w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+
+                    <button
+                        onClick={() => navigate("/add-device")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                    >
+                        + Add Device
+                    </button>
+                </div>
             </div>
 
-            {loading ? (
-                <p className="text-center">Loading devices...</p>
-            ) : devices.length === 0 ? (
-                <p className="text-center text-gray-500">No devices found</p>
+            {devices.length === 0 ? (
+                <p className="text-gray-500">No devices found.</p>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full border">
-                        <thead className="bg-gray-100">
-                            <tr>
-                                <th className="border p-2">#</th>
-                                <th className="border p-2">Device ID</th>
-                                <th className="border p-2">Device Name</th>
-                                <th className="border p-2">Company</th>
-                                <th className="border p-2">Location</th>
-                                <th className="border p-2">Status</th>
-                                <th className="border p-2">Actions</th>
-                            </tr>
-                        </thead>
+                <>
+                    {/* <div className="mb-2 text-sm text-gray-500">
+                        Showing {paginatedDevices.length} of {sortedDevices.length} devices
+                    </div> */}
 
-                        <tbody>
-                            {devices.map((d, i) => (
-                                <tr key={d._id} className="text-center">
-                                    <td className="border p-2">{i + 1}</td>
-                                    <td className="border p-2 font-medium">{d.deviceId}</td>
-                                    <td className="border p-2">{d.deviceName || "—"}</td>
-                                    <td className="border p-2">{d.company_id?.name || "—"}</td>
-                                    <td className="border p-2">
-                                        {Array.isArray(d.location_id) && d.location_id.length > 0
-                                            ? d.location_id.map((loc) => loc.name).join(", ")
-                                            : "—"}
-                                    </td>
-                                    <td className="border p-2">
-                                        <span
-                                            className={`px-2 py-1 rounded text-white ${d.status === "active"
-                                                ? "bg-green-600"
-                                                : "bg-red-600"
-                                                }`}
-                                        >
-                                            {d.status}
-                                        </span>
-                                    </td>
-                                    <td className="border p-2 space-x-2">
-                                        <button
-                                            onClick={() => navigate(`/edit-device/${d._id}`)}
-                                            className="px-3 py-1 bg-yellow-500 text-white rounded"
-                                        >
-                                            Edit
-                                        </button>
+                    <div className="overflow-x-auto rounded-lg border shadow-sm bg-white">
+                        <table className="w-full min-w-[900px] border-collapse">
+                            <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                                <tr>
+                                    <th className="p-3 border">#</th>
 
-                                        <button
-                                            onClick={() => handleDelete(d._id)}
-                                            className="px-3 py-1 bg-red-600 text-white rounded"
-                                        >
-                                            Delete
-                                        </button>
-                                    </td>
+                                    <th
+                                        onClick={() => handleSort("deviceId")}
+                                        className="cursor-pointer p-3 border"
+                                    >
+                                        Device ID{" "}
+                                        {sortField === "deviceId" &&
+                                            (sortDirection === "asc" ? "↑" : "↓")}
+                                    </th>
+
+                                    <th
+                                        onClick={() => handleSort("deviceName")}
+                                        className="cursor-pointer p-3 border"
+                                    >
+                                        Device Name{" "}
+                                        {sortField === "deviceName" &&
+                                            (sortDirection === "asc" ? "↑" : "↓")}
+                                    </th>
+
+                                    <th className="p-3 border">Company</th>
+                                    <th className="p-3 border">Location</th>
+                                    <th className="p-3 border">Status</th>
+                                    <th className="p-3 border text-center">Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+
+                            <tbody>
+                                {paginatedDevices.map((d, i) => (
+                                    <tr key={d._id} className="hover:bg-blue-50">
+                                        <td className="p-2 border">
+                                            {(page - 1) * itemsPerPage + i + 1}
+                                        </td>
+
+                                        <td className="p-2 border font-medium">{d.deviceId}</td>
+                                        <td className="p-2 border">{d.deviceName || "—"}</td>
+                                        <td className="p-2 border">
+                                            {d.company_id?.name || "—"}
+                                        </td>
+
+                                        <td className="p-2 border">
+                                            {Array.isArray(d.location_id) &&
+                                                d.location_id.length > 0
+                                                ? d.location_id.map((loc) => loc.name).join(", ")
+                                                : "—"}
+                                        </td>
+
+                                        <td className="p-2 border">
+                                            <span
+                                                className={`px-2 py-1 rounded-full text-xs font-medium ${d.status === "active"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-red-100 text-red-700"
+                                                    }`}
+                                            >
+                                                {d.status}
+                                            </span>
+                                        </td>
+
+                                        <td className="p-2 border">
+                                            <div className="flex justify-center gap-2">
+                                                <button
+                                                    onClick={() => navigate(`/edit-device/${d._id}`)}
+                                                    className="text-yellow-600"
+                                                >
+                                                    <FaEdit />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleDelete(d._id)}
+                                                    className="text-red-600"
+                                                >
+                                                    <FaTrash />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex justify-end items-center gap-2 mt-4">
+                        {Array.from({
+                            length: Math.ceil(sortedDevices.length / itemsPerPage),
+                        }).map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => setPage(i + 1)}
+                                className={`px-3 py-1 rounded-md border text-sm ${page === i + 1
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "hover:bg-gray-100"
+                                    }`}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                    </div>
+                </>
             )}
         </div>
     );

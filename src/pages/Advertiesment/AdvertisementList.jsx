@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import {
@@ -6,8 +6,9 @@ import {
   deleteAdvertisement,
 } from "../services/advertisement.api";
 import api from "../../api/axios";
-
-
+import { io } from "socket.io-client";
+import { SOCKET_BASE_URL } from "../../config";
+import { useRef } from "react";
 
 export default function AdvertisementList() {
   const [ads, setAds] = useState([]);
@@ -15,6 +16,14 @@ export default function AdvertisementList() {
   const [isPlaying, setIsPlaying] = useState([]); // array of DEVICE IDs (MAC)
   const [deviceMap, setDeviceMap] = useState({});
   const [pausedDevices, setPausedDevices] = useState([]);
+
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState("");
+  const [sortDirection, setSortDirection] = useState("asc");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+  const socketRef = useRef(null); // ✅ ADD THIS
+
 
   const fetchAds = async () => {
     setLoading(true);
@@ -45,6 +54,25 @@ export default function AdvertisementList() {
 
   useEffect(() => {
     fetchAds();
+  }, []);
+
+  useEffect(() => {
+    if (!SOCKET_BASE_URL) return;
+
+    socketRef.current = io(SOCKET_BASE_URL, {
+      transports: ["websocket"],
+      reconnection: true,
+    });
+
+    socketRef.current.on("device-status", (data) => {
+      if (data?.playingDevices) {
+        setIsPlaying(data.playingDevices);
+      }
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
   }, []);
 
   const handleDelete = async (id) => {
@@ -147,192 +175,319 @@ export default function AdvertisementList() {
     }
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setPage(1);
+  };
+
+  // 🔍 Search
+  const filteredAds = useMemo(() => {
+    return ads.filter((ad) =>
+      ad.title?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [ads, search]);
+
+  const sortedAds = useMemo(() => {
+    if (!sortField) return filteredAds;
+
+    return [...filteredAds].sort((a, b) => {
+      const aVal = a[sortField] || "";
+      const bVal = b[sortField] || "";
+
+      return sortDirection === "asc"
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+  }, [filteredAds, sortField, sortDirection]);
+
+  const paginatedAds = useMemo(() => {
+    return sortedAds.slice(
+      (page - 1) * itemsPerPage,
+      page * itemsPerPage
+    );
+  }, [sortedAds, page]);
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-6 min-h-full">
-        <p>Loading advertisements...</p>
+      <div className="p-6 space-y-3">
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="h-12 bg-gray-200 rounded animate-pulse"
+          />
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 min-h-full">
-      <div className="flex justify-between mb-6">
-        <h2 className="text-2xl font-semibold">Advertisements</h2>
-        <Link
-          to="/advertisements/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          + Add Advertisement
-        </Link>
+    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4 min-h-full">
+      {/* Header + Search */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold">Advertisements</h2>
+          <p className="text-gray-500 text-sm">
+            Manage and control your advertisements
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          {/* Search */}
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search advertisements..."
+            className="border px-3 py-2 rounded w-full sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <Link
+            to="/advertisements/new"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-center"
+          >
+            + Add Advertisement
+          </Link>
+        </div>
       </div>
 
       {ads.length === 0 ? (
         <p className="text-gray-600">No advertisements found.</p>
       ) : (
-        <table className="w-full border">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-2 border">Title</th>
-              <th className="p-2 border">Company</th>
-              <th className="p-2 border">Location</th>
-              <th className="p-2 border">Screen URL</th>
-              <th className="p-2 border">Devices</th>
-              <th className="p-2 border">Status</th>
-              <th className="p-2 border">Actions</th>
-            </tr>
-          </thead>
+        <>
+          {/* Count */}
+          {/* <div className="mb-2 text-sm text-gray-500">
+            Showing {paginatedAds.length} of {sortedAds.length} advertisements
+          </div> */}
 
-          <tbody>
-            {ads.map((ad) => (
-              <tr key={ad._id}>
-                <td className="p-2 border">{ad.title}</td>
-                <td className="p-2 border">
-                  {Array.isArray(ad.company_ids) && ad.company_ids.length > 0
-                    ? ad.company_ids.map((c) => c.name).join(", ")
-                    : "-"}
-                </td>
+          <div className="overflow-x-auto rounded-lg border shadow-sm bg-white">
+            <table className="w-full min-w-[900px] border-collapse">
+              <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                <tr>
+                  <th
+                    onClick={() => handleSort("title")}
+                    className="cursor-pointer p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-left"
+                  >
+                    Title{" "}
+                    {sortField === "title" &&
+                      (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th className="p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-left">
+                    Company
+                  </th>
+                  <th className="p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-left">
+                    Location
+                  </th>
+                  <th className="p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-left">
+                    Screen URL
+                  </th>
+                  <th className="p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-left">
+                    Devices
+                  </th>
+                  <th className="p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-left">
+                    Status
+                  </th>
+                  <th className="p-3 text-xs font-semibold uppercase tracking-wide text-gray-600 border text-center">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
 
-                <td className="p-2 border">
-                  {Array.isArray(ad.location_ids) && ad.location_ids.length > 0
-                    ? ad.location_ids.map((l) => l.name).join(", ")
-                    : "-"}
-                </td>
+              <tbody>
+                {paginatedAds.map((ad) => (
+                  <tr
+                    key={ad._id}
+                    className="hover:bg-blue-50 transition"
+                  >
+                    {/* Title */}
+                    <td className="p-2 border text-sm">{ad.title}</td>
 
+                    {/* Company */}
+                    <td className="p-2 border text-sm">
+                      {Array.isArray(ad.company_ids) &&
+                        ad.company_ids.length > 0
+                        ? ad.company_ids.map((c) => c.name).join(", ")
+                        : "-"}
+                    </td>
 
-                <td className="p-2 border">
-                  <div className="flex flex-col gap-1">
-                    {Array.isArray(ad.deviceId) &&
-                      ad.deviceId.map((mac) => {
-                        const device = deviceMap[mac];
+                    {/* Location */}
+                    <td className="p-2 border text-sm">
+                      {Array.isArray(ad.location_ids) &&
+                        ad.location_ids.length > 0
+                        ? ad.location_ids.map((l) => l.name).join(", ")
+                        : "-"}
+                    </td>
 
-                        if (!device?.screenToken) return null;
+                    {/* Screen URL */}
+                    <td className="p-2 border text-sm">
+                      <div className="flex flex-col gap-1 max-w-[220px]">
+                        {Array.isArray(ad.deviceId) &&
+                          ad.deviceId.map((mac) => {
+                            const device = deviceMap[mac];
+                            if (!device?.screenToken) return null;
+
+                            return (
+                              <a
+                                key={mac}
+                                href={`${window.location.origin}/screen/${device.screenToken}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-purple-600 hover:underline break-all"
+                              >
+                                /screen/{device.screenToken}
+                              </a>
+                            );
+                          })}
+                      </div>
+                    </td>
+
+                    {/* Devices */}
+                    <td className="p-2 border text-sm">
+                      {Array.isArray(ad.deviceId) && ad.deviceId.length > 0
+                        ? ad.deviceId
+                          .map(
+                            (mac) =>
+                              deviceMap[mac]?.deviceName || mac
+                          )
+                          .join(", ")
+                        : "-"}
+                    </td>
+
+                    {/* Status */}
+                    <td className="p-2 border">
+                      {(() => {
+                        const deviceIds = ad.deviceId || [];
+
+                        const isAnyPaused = deviceIds.some((d) =>
+                          pausedDevices.includes(d)
+                        );
+
+                        const isAnyPlaying = deviceIds.some((d) =>
+                          isPlaying.includes(d)
+                        );
+
+                        if (isAnyPaused) {
+                          return (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                              ⏸ Paused
+                            </span>
+                          );
+                        }
+
+                        if (isAnyPlaying) {
+                          return (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              ▶ Playing
+                            </span>
+                          );
+                        }
 
                         return (
-                          <a
-                            key={mac}
-                            href={`${window.location.origin}/screen/${device.screenToken}`} target="_blank"
-                            className="text-purple-600 hover:underline text-sm"
-                          >
-                            /screen/{device.screenToken}
-                          </a>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            Active
+                          </span>
                         );
-                      })}
-                  </div>
-                </td>
+                      })()}
+                    </td>
 
-
-                {/* ✅ FIXED: Show multiple devices properly */}
-                <td className="p-2 border">
-                  {Array.isArray(ad.deviceId) && ad.deviceId.length > 0
-                    ? ad.deviceId
-                      .map((mac) => deviceMap[mac]?.deviceName || mac)
-                      .join(", ")
-                    : "-"}
-                </td>
-
-
-                {/* STATUS */}
-                <td className="p-2 border">
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${Array.isArray(ad.deviceId) &&
-                      (ad.deviceId || []).some(d => isPlaying.includes(d))
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-green-100 text-green-700"
-                      }`}
-                  >
-                    {Array.isArray(ad.deviceId) &&
-                      (ad.deviceId || []).some(d => isPlaying.includes(d))
-                      ? "Playing"
-                      : "Active"}
-                  </span>
-                </td>
-
-
-                <td className="p-6 border">
-                  <div className="flex items-center justify-center gap-3">
-                    <Link
-                      to={`/advertisements/${ad._id}`}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <FaEye size={18} />
-                    </Link>
-
-                    <Link
-                      to={`/advertisements/${ad._id}/edit`}
-                      className="text-green-600 hover:text-green-800"
-                    >
-                      <FaEdit size={18} />
-                    </Link>
-
-                    <button
-                      onClick={() => handleDelete(ad._id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <FaTrash size={18} />
-                    </button>
-
-                    {/* 🔥 SINGLE TOGGLE BUTTON (Play All / Stop All) */}
-
-
-                    {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 && (
-                      <div className="flex gap-2">
-
-                        {/* ▶ PLAY */}
-                        <button
-                          onClick={() =>
-                            playAllInLocation(
-                              ad.company_ids?.[0]?._id,
-                              ad.location_ids?.[0]?._id,
-                              ad.deviceId
-                            )
-
-                          }
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                    {/* Actions */}
+                    <td className="p-2 border">
+                      <div className="flex flex-wrap md:flex-nowrap items-center justify-center gap-2">
+                        <Link
+                          to={`/advertisements/${ad._id}`}
+                          className="text-blue-600 hover:text-blue-800"
                         >
-                          ▶ Play
+                          <FaEye size={18} />
+                        </Link>
+
+                        <Link
+                          to={`/advertisements/${ad._id}/edit`}
+                          className="text-green-600 hover:text-green-800"
+                        >
+                          <FaEdit size={18} />
+                        </Link>
+
+                        <button
+                          onClick={() => handleDelete(ad._id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash size={18} />
                         </button>
 
-                        {/* ⏸ PAUSE */}
-                        <button
-                          onClick={() =>
-                            pauseAllInLocation(
-                              ad.company_ids?.[0]?._id,
-                              ad.location_ids?.[0]?._id,
+                        {Array.isArray(ad.deviceId) &&
+                          ad.deviceId.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() =>
+                                  playAllInLocation(
+                                    ad.company_ids?.[0]?._id,
+                                    ad.location_ids?.[0]?._id,
+                                    ad.deviceId
+                                  )
+                                }
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-3 py-1 rounded text-xs"
+                              >
+                                ▶ Play
+                              </button>
 
-                              ad.deviceId
-                            )
-                          }
-                          className="bg-yellow-500 text-white px-3 py-1 rounded text-sm"
-                        >
-                          ⏸ Pause
-                        </button>
+                              <button
+                                onClick={() =>
+                                  pauseAllInLocation(
+                                    ad.company_ids?.[0]?._id,
+                                    ad.location_ids?.[0]?._id,
+                                    ad.deviceId
+                                  )
+                                }
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-2 sm:px-3 py-1 rounded text-xs"
+                              >
+                                ⏸ Pause
+                              </button>
 
-                        {/* ⛔ STOP */}
-                        <button
-                          onClick={() =>
-                            stopAllInLocation(
-                              ad.company_ids?.[0]?._id,
-                              ad.location_ids?.[0]?._id,
-
-                              ad.deviceId
-                            )
-                          }
-                          className="bg-red-600 text-white px-3 py-1 rounded text-sm"
-                        >
-                          ⛔ Stop
-                        </button>
-
+                              <button
+                                onClick={() =>
+                                  stopAllInLocation(
+                                    ad.company_ids?.[0]?._id,
+                                    ad.location_ids?.[0]?._id,
+                                    ad.deviceId
+                                  )
+                                }
+                                className="bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1 rounded text-xs"
+                              >
+                                ⛔ Stop
+                              </button>
+                            </div>
+                          )}
                       </div>
-                    )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-                  </div>
-                </td>
-              </tr>
+          </div>
+          <div className="flex justify-end items-center gap-2 mt-4">
+            {Array.from({
+              length: Math.ceil(sortedAds.length / itemsPerPage),
+            }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i + 1)}
+                className={`px-3 py-1 rounded-md border text-sm transition ${page === i + 1
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "hover:bg-gray-100"
+                  }`}
+              >
+                {i + 1}
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </>
       )}
     </div>
   );
