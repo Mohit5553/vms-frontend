@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { getAdminDashboardStats } from "../services/admin.api";
 import api from "../../api/axios";
 import { SOCKET_BASE_URL } from "../../config";
+import { io } from "socket.io-client";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [liveScreens, setLiveScreens] = useState([]);
+  const lastUpdateRef = useRef({}); // ✅ MOVE HERE
+  const videoRefs = useRef({});
   const groupedScreens = liveScreens.reduce((acc, screen) => {
     const company = screen.companyName || "Unknown Company";
 
@@ -28,6 +31,21 @@ export default function AdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+
+  useEffect(() => {
+    liveScreens.forEach((screen) => {
+      const video = videoRefs.current[screen.deviceId];
+
+      if (
+        video &&
+        screen.currentVideo &&
+        screen.currentTime &&
+        Math.abs(video.currentTime - screen.currentTime) > 1
+      ) {
+        video.currentTime = screen.currentTime;
+      }
+    });
+  }, [liveScreens]);
   /* ===============================
      Fetch Live Screens (Auto Refresh)
   =============================== */
@@ -35,8 +53,6 @@ export default function AdminDashboard() {
     const fetchLiveScreens = async () => {
       try {
         const res = await api.get("/admin/live-screens");
-        console.log("Live Screens:", res.data.data);
-
         setLiveScreens(res.data.data || []);
       } catch (err) {
         console.error("Live screens error:", err);
@@ -44,9 +60,31 @@ export default function AdminDashboard() {
     };
 
     fetchLiveScreens();
-    const interval = setInterval(fetchLiveScreens, 3000);
 
-    return () => clearInterval(interval);
+    const socket = io(SOCKET_BASE_URL, {
+      transports: ["websocket"],
+    });
+
+    socket.on("live_screens_update", (data) => {
+      setLiveScreens((prev) => {
+        return data.map((screen) => {
+          const prevScreen = lastUpdateRef.current[screen.deviceId];
+
+          if (
+            prevScreen &&
+            prevScreen.currentVideo === screen.currentVideo &&
+            Math.abs((prevScreen.currentTime || 0) - (screen.currentTime || 0)) < 1
+          ) {
+            return prevScreen;
+          }
+
+          lastUpdateRef.current[screen.deviceId] = screen;
+          return screen;
+        });
+      });
+    });
+
+    return () => socket.disconnect();
   }, []);
 
   if (loading || !stats) {
@@ -114,12 +152,32 @@ export default function AdminDashboard() {
                         </div>
                       ) : screen.currentVideo ? (
                         <video
-                          src={`${SOCKET_BASE_URL}${screen.currentVideo}`}
-                          className="w-full h-56 object-contain bg-black"
+                          ref={(el) => {
+                            if (!el) return;
+
+                            videoRefs.current[screen.deviceId] = el;
+
+                            const src = `${SOCKET_BASE_URL}${screen.currentVideo}`;
+
+                            if (el.src !== src) {
+                              el.src = src;
+                            }
+
+                            if (
+                              screen.currentTime &&
+                              Math.abs(el.currentTime - screen.currentTime) > 1
+                            ) {
+                              el.currentTime = screen.currentTime;
+                            }
+
+                            if (el.paused) {
+                              el.play().catch(() => { });
+                            }
+                          }}
                           muted
                           autoPlay
-                          loop
                           playsInline
+                          className="w-full h-56 object-contain bg-black"
                         />
                       ) : (
                         <div className="w-full h-56 bg-gray-500 flex items-center justify-center text-white">

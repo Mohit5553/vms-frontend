@@ -26,21 +26,20 @@ export default function AdScreen() {
   useEffect(() => {
     if (!token) return;
 
-    api
-      .get(`/devices/by-token/${token}`)
+    api.get(`/devices/by-token/${token}`)
       .then((res) => {
         const device = res.data.data;
 
+        // ✅ Generate stable custom device ID
         setDEVICE_ID(device.deviceId);
 
-        // 🔥 If multiple locations, pick first
         if (device.location_id?.length) {
           setLocationId(device.location_id[0]._id);
         }
+
       })
       .catch(console.error);
   }, [token]);
-
   /* ================= REGISTER DEVICE ================= */
 
   useEffect(() => {
@@ -90,22 +89,21 @@ export default function AdScreen() {
 
         if (videoRef.current) {
           videoRef.current.currentTime = resumeTimeRef.current;
-          videoRef.current.play().catch(console.error);
+          safePlay();
         }
 
         if (socketRef.current && ads?.length) {
           socketRef.current.emit("playing_video", {
             deviceId: DEVICE_ID,
-            videoPath:
-              ads[currentIndex]?.videoPath || ads[0].videoPath,
+            videoPath: ads[currentIndex]?.videoPath || ads[0].videoPath,
+            currentTime: resumeTimeRef.current, // 🔥 MUST
           });
         }
 
         return;
       }
 
-      if (playerLoadedRef.current) return;
-
+      // playerLoadedRef.current = true;
       playerLoadedRef.current = true;
 
       setPlaylist(ads);
@@ -146,30 +144,63 @@ export default function AdScreen() {
     return () => socket.disconnect();
   }, [DEVICE_ID, locationId]);
 
+
+  const safePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch(() => { });
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (
+        videoRef.current &&
+        !videoRef.current.paused &&
+        socketRef.current
+      ) {
+        socketRef.current.emit("playing_video", {
+          deviceId: DEVICE_ID,
+          videoPath: playlist[currentIndex]?.videoPath,
+          currentTime: videoRef.current.currentTime, // 🔥 IMPORTANT
+        });
+      }
+    }, 1000); // every 1 second
+
+    return () => clearInterval(interval);
+  }, [DEVICE_ID, playlist, currentIndex]);
   /* ================= VIDEO LOAD ================= */
 
   useEffect(() => {
     if (!playlist.length || !videoRef.current) return;
 
     const currentAd = playlist[currentIndex];
-    const videoUrl =
-      `${SOCKET_BASE_URL}${currentAd.videoPath}`;
 
-    if (videoRef.current.src !== videoUrl) {
-      videoRef.current.src = videoUrl;
+    const video = videoRef.current;
+
+    if (!video) return;
+
+    const newSrc = `${SOCKET_BASE_URL}${currentAd.videoPath}`;
+
+    if (video.src !== newSrc) {
+      video.src = newSrc;
+      video.currentTime = 0;
     }
 
-    videoRef.current.muted = true;
-    videoRef.current.play().catch(console.error);
-
+    safePlay();
     socketRef.current?.emit("playing_video", {
       deviceId: DEVICE_ID,
       videoPath: currentAd.videoPath,
+      currentTime: videoRef.current.currentTime,
     });
   }, [playlist, currentIndex, DEVICE_ID]);
-
   /* ================= UI ================= */
-
+  console.log(
+    "VIDEO URL:",
+    `${SOCKET_BASE_URL}${playlist[currentIndex]?.videoPath}`
+  );
   return (
     <div className="w-screen h-screen bg-black relative">
       {playlist.length ? (
@@ -180,7 +211,12 @@ export default function AdScreen() {
             autoPlay
             muted
             playsInline
-            loop
+            loop={playlist.length === 1}
+            onEnded={() => {
+              if (playlist.length > 1) {
+                setCurrentIndex((prev) => (prev + 1) % playlist.length);
+              }
+            }}
           />
 
           {/* 🔥 ticker */}

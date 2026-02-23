@@ -40,11 +40,9 @@ const AdvertisementForm = ({ initialData = null }) => {
   const [formData, setFormData] = useState({
     company_ids: initialData?.company_ids || [],
     location_ids: initialData?.location_ids || [],
-    deviceIds: initialData?.deviceIds || [],
+    deviceIds: initialData?.deviceId || [],
     title: initialData?.title || "",
     description: initialData?.description || "",
-    startDate: initialData?.startDate?.slice(0, 10) || "",
-    endDate: initialData?.endDate?.slice(0, 10) || "",
     playOrder: initialData?.playOrder || 1,
   });
 
@@ -97,8 +95,6 @@ const AdvertisementForm = ({ initialData = null }) => {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === "company_id" && { location_id: "", deviceId: [] }),
-      ...(name === "location_id" && { deviceId: [] }),
     }));
   };
 
@@ -161,7 +157,6 @@ const AdvertisementForm = ({ initialData = null }) => {
       } else {
         payload.append(key, value);
       }
-
     });
 
     if (videoFile) {
@@ -431,7 +426,7 @@ const AdvertisementForm = ({ initialData = null }) => {
         onChange={handleChange}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* <div className="grid grid-cols-2 gap-4">
         <Input
           label="Start Date"
           name="startDate"
@@ -447,6 +442,47 @@ const AdvertisementForm = ({ initialData = null }) => {
           onChange={handleChange}
         />
       </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          label="Start Time"
+          name="startTime"
+          type="time"
+          value={formData.startTime || ""}
+          onChange={handleChange}
+        />
+
+        <Input
+          label="End Time"
+          name="endTime"
+          type="time"
+          value={formData.endTime || ""}
+          onChange={handleChange}
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-1 font-medium">Days</label>
+
+        {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
+          <label key={day} className="mr-4">
+            <input
+              type="checkbox"
+              checked={formData.days?.includes(day)}
+              onChange={() => {
+                setFormData(prev => {
+                  const exists = prev.days?.includes(day);
+                  return {
+                    ...prev,
+                    days: exists
+                      ? prev.days.filter(d => d !== day)
+                      : [...(prev.days || []), day],
+                  };
+                });
+              }}
+            />
+            {day}
+          </label>
+        ))}
+      </div> */}
 
       <Textarea
         label="Description"

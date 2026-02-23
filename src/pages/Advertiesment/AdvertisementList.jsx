@@ -76,6 +76,11 @@ export default function AdvertisementList() {
         sessionStorage.setItem("playingDevices", JSON.stringify(updated));
         return updated;
       });
+      setPausedDevices(prev => {
+        const updated = prev.filter(id => !deviceIds.includes(id));
+        sessionStorage.setItem("pausedDevices", JSON.stringify(updated));
+        return updated;
+      });
     } catch (error) {
       console.error("Play All Error:", error);
       alert("Play All failed — check console");
@@ -83,21 +88,29 @@ export default function AdvertisementList() {
   };
   const stopAllInLocation = async (companyId, locationId, deviceIds = []) => {
     try {
-      // ✅ Use your EXISTING route: /advertisement/stop
-      for (const deviceId of deviceIds) {
-        // await axios.post(`${API_URL}/advertisement/stop`, {
-        await api.post("/advertisement/stop", {
+      await Promise.all(
+        deviceIds.map((deviceId) =>
+          api.post("/advertisement/stop", {
+            companyId,
+            deviceId,
+          })
+        )
+      );
 
-          companyId,
-          deviceId,
-        });
-      }
-
+      // remove from playing
       setIsPlaying((prev) => {
         const updated = prev.filter((id) => !deviceIds.includes(id));
         sessionStorage.setItem("playingDevices", JSON.stringify(updated));
         return updated;
       });
+
+      // remove from paused
+      setPausedDevices((prev) => {
+        const updated = prev.filter((id) => !deviceIds.includes(id));
+        sessionStorage.setItem("pausedDevices", JSON.stringify(updated));
+        return updated;
+      });
+
     } catch (error) {
       console.error("Stop All Error:", error);
       alert("Stop All failed — check console");
@@ -105,16 +118,26 @@ export default function AdvertisementList() {
   };
   const pauseAllInLocation = async (companyId, locationId, deviceIds = []) => {
     try {
-      for (const deviceId of deviceIds) {
-        await api.post("/advertisement/pause", {
-          companyId,
-          deviceId,
-        });
-      }
+      await Promise.all(
+        deviceIds.map((deviceId) =>
+          api.post("/advertisement/pause", {
+            companyId,
+            deviceId,
+          })
+        )
+      );
 
+      // Add paused
       setPausedDevices((prev) => {
         const updated = Array.from(new Set([...prev, ...deviceIds]));
         sessionStorage.setItem("pausedDevices", JSON.stringify(updated));
+        return updated;
+      });
+
+      // Remove playing
+      setIsPlaying((prev) => {
+        const updated = prev.filter((id) => !deviceIds.includes(id));
+        sessionStorage.setItem("playingDevices", JSON.stringify(updated));
         return updated;
       });
 
@@ -123,6 +146,7 @@ export default function AdvertisementList() {
       alert("Pause failed");
     }
   };
+
 
   if (loading) {
     return (
@@ -188,8 +212,7 @@ export default function AdvertisementList() {
                         return (
                           <a
                             key={mac}
-                            href={`/screen/${device.screenToken}`}
-                            target="_blank"
+                            href={`${window.location.origin}/screen/${device.screenToken}`} target="_blank"
                             className="text-purple-600 hover:underline text-sm"
                           >
                             /screen/{device.screenToken}
@@ -214,13 +237,13 @@ export default function AdvertisementList() {
                 <td className="p-2 border">
                   <span
                     className={`px-2 py-1 rounded text-sm ${Array.isArray(ad.deviceId) &&
-                      ad.deviceId.some(d => isPlaying.includes(d))
+                      (ad.deviceId || []).some(d => isPlaying.includes(d))
                       ? "bg-blue-100 text-blue-700"
                       : "bg-green-100 text-green-700"
                       }`}
                   >
                     {Array.isArray(ad.deviceId) &&
-                      ad.deviceId.some(d => isPlaying.includes(d))
+                      (ad.deviceId || []).some(d => isPlaying.includes(d))
                       ? "Playing"
                       : "Active"}
                   </span>
@@ -251,37 +274,7 @@ export default function AdvertisementList() {
                     </button>
 
                     {/* 🔥 SINGLE TOGGLE BUTTON (Play All / Stop All) */}
-                    {/* {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 && (
-                      <div className="mb-2">
-                        {isLocationPlaying(ad.deviceId) ? (
-                          <button
-                            onClick={() =>
-                              stopAllInLocation(
-                                ad.company_id?._id,
-                                ad.location_id?._id,
-                                ad.deviceId
-                              )
-                            }
-                            className="bg-red-600 text-white px-3 py-1 rounded text-sm"
-                          >
-                            ⛔ Stop All
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              playAllInLocation(
-                                ad.company_id?._id,
-                                ad.location_id?._id,
-                                ad.deviceId
-                              )
-                            }
-                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
-                          >
-                            ▶ Play All
-                          </button>
-                        )}
-                      </div>
-                    )} */}
+
 
                     {Array.isArray(ad.deviceId) && ad.deviceId.length > 0 && (
                       <div className="flex gap-2">
